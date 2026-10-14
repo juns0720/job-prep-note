@@ -290,6 +290,29 @@ create policy "job_postings는 본인 것만" on job_postings
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ---------------------------------------------------------------------------
+-- 공고 필터링 규칙
+-- 앱의 공고 화면에서 직무·경력·스택 칩을 눌러 고르고, 수집기(scripts/collect.mjs)가 읽어
+-- 거른다. 사용자마다 한 줄이고, 화면에서 처음 고를 때 생긴다.
+--   roles    frontend | backend
+--   careers  entry(신입) | experienced(경력)
+--   stacks   Java, Spring, React … (lib/job-filter.json의 id)
+-- 고를 수 있는 항목과 그걸 알아보는 낱말은 lib/job-filter.json에, 맞춰 보는 방식은
+-- scripts/lib/rules.mjs에 있다. 갈래마다 아무것도 안 고르면 거르지 않는다.
+-- ---------------------------------------------------------------------------
+create table job_rules (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  updated_at timestamptz not null default now(),
+  roles text[] not null default '{}',
+  careers text[] not null default '{}',
+  stacks text[] not null default '{}'
+);
+
+alter table job_rules enable row level security;
+
+create policy "job_rules는 본인 것만" on job_rules
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
 -- 권한
 -- 로그인한 사용자만 테이블에 접근한다. 어느 행을 볼 수 있는지는 위의 RLS 정책이 정한다.
 -- 로그인하지 않은 요청(anon)에는 아무 권한도 주지 않는다.
@@ -297,5 +320,5 @@ create policy "job_postings는 본인 것만" on job_postings
 grant select, insert, update, delete on
   periods, companies, cover_questions, company_events,
   topics, interview_questions, material_groups, materials,
-  projects, job_postings
+  projects, job_postings, job_rules
 to authenticated;

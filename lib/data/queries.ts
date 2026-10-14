@@ -1,8 +1,8 @@
 import "server-only";
 import { currentPeriodLabel } from "@/lib/date";
 import { createClient } from "@/lib/supabase/server";
-import type { Company, JobPosting, MaterialGroup, Project, Topic } from "@/lib/types";
-import { groupBy, mapCompanyRow, mapJobPostingRow, mapMaterialGroupRow, mapProjectRow, mapTopicRow } from "./mappers";
+import type { Company, JobPosting, JobRules, MaterialGroup, Project, Topic } from "@/lib/types";
+import { groupBy, mapCompanyRow, mapJobPostingRow, mapJobRulesRow, mapMaterialGroupRow, mapProjectRow, mapTopicRow } from "./mappers";
 
 export type UserData = {
   periodList: string[];
@@ -11,6 +11,8 @@ export type UserData = {
   materialGroups: MaterialGroup[];
   projects: Project[];
   jobs: JobPosting[];
+  /** 아직 저장한 적이 없으면 null */
+  jobRules: JobRules | null;
 };
 
 /**
@@ -56,6 +58,7 @@ export async function loadUserData(userId: string): Promise<UserData> {
     { data: materialRows, error: materialError },
     { data: projectRows, error: projectError },
     { data: eventRows, error: eventError },
+    { data: jobRulesRow, error: jobRulesError },
   ] = await Promise.all([
     supabase.from("companies").select("*").eq("user_id", userId).order("due", { ascending: true, nullsFirst: false }),
     supabase.from("cover_questions").select("*").eq("user_id", userId),
@@ -72,6 +75,7 @@ export async function loadUserData(userId: string): Promise<UserData> {
     supabase.from("materials").select("*").eq("user_id", userId),
     supabase.from("projects").select("*").eq("user_id", userId).order("sort_order", { ascending: true }),
     supabase.from("company_events").select("*").eq("user_id", userId),
+    supabase.from("job_rules").select("*").eq("user_id", userId).maybeSingle(),
   ]);
 
   if (companyError) throw companyError;
@@ -87,6 +91,8 @@ export async function loadUserData(userId: string): Promise<UserData> {
   if (projectError) console.error("프로젝트를 읽지 못했다. supabase/schema.sql을 올렸는지 본다.", projectError);
   // 전형 일정이 없어도 회사는 보여야 한다.
   if (eventError) console.error("전형 일정을 읽지 못했다. supabase/schema.sql을 올렸는지 본다.", eventError);
+  // 규칙이 없어도 공고는 보여야 한다.
+  if (jobRulesError) console.error("필터링 규칙을 읽지 못했다. supabase/schema.sql을 올렸는지 본다.", jobRulesError);
   const eventsByCompany = groupBy(eventError ? [] : (eventRows ?? []), (e) => e.company_id);
   const materialsByGroup = groupBy(materialRows ?? [], (m) => m.group_id);
 
@@ -102,5 +108,6 @@ export async function loadUserData(userId: string): Promise<UserData> {
       : (materialGroupRows ?? []).map((row) => mapMaterialGroupRow(row, materialsByGroup.get(row.id) ?? [])),
     projects: projectError ? [] : (projectRows ?? []).map(mapProjectRow),
     jobs: jobError ? [] : (jobRows ?? []).map(mapJobPostingRow),
+    jobRules: !jobRulesError && jobRulesRow ? mapJobRulesRow(jobRulesRow) : null,
   };
 }

@@ -106,6 +106,17 @@ export type JobPosting = {
   companyInfo: CompanyInfo | null;
 };
 
+/**
+ * 공고 필터링 규칙. DB의 job_rules와 짝이고 사용자마다 하나다.
+ * 값은 lib/job-filter.json의 id들이다. 수집기(scripts/collect.mjs)가 읽어 거르고,
+ * 맞추는 방식은 scripts/lib/rules.mjs에 있다. 갈래마다 비어 있으면 거르지 않는다.
+ */
+export type JobRules = {
+  roles: string[];
+  careers: string[];
+  stacks: string[];
+};
+
 export type CompanyInfo = {
   source: string;
   company_id?: number;

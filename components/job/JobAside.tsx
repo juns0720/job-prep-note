@@ -1,6 +1,7 @@
 "use client";
 
 import { JobRow } from "./JobRow";
+import { JobRules } from "./JobRules";
 import { LIST_CARD } from "../ui/classes";
 import { SortButton, ViewButton } from "../ui/ListToggle";
 import { useStudyNote, type JobSort, type JobSource, type JobView } from "@/lib/store";
@@ -27,6 +28,8 @@ export function JobAside() {
 
   return (
     <div>
+      <JobRules />
+
       <div className="mb-7 flex flex-wrap items-center gap-2">
         <ViewButton label="대기" count={open.length} active={s.jobView === "open"} onClick={() => s.setJobView("open")} />
         <ViewButton label="옮김" count={moved.length} active={s.jobView === "moved"} onClick={() => s.setJobView("moved")} />

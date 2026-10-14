@@ -300,6 +300,29 @@ export type Database = {
         };
         Relationships: [];
       };
+      job_rules: {
+        Row: {
+          user_id: string;
+          roles: string[];
+          careers: string[];
+          stacks: string[];
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          roles?: string[];
+          careers?: string[];
+          stacks?: string[];
+          updated_at?: string;
+        };
+        Update: {
+          roles?: string[];
+          careers?: string[];
+          stacks?: string[];
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       interview_questions: {
         Row: {
           id: string;

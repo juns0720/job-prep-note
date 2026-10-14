@@ -10,7 +10,7 @@
 | **재료** | 자소서에 쓸 경험과 문항을 컨셉(갈등 상황, 기술 답변 …)별로 모아 둡니다. 실제로 쓸 것만 "최종"으로 골라 둘 수 있습니다 |
 | **프로젝트** | 해온 프로젝트를 이름·설명·키워드로 적어 둡니다 |
 | **면접 준비** | 주제별로 예상 질문, 키워드, 답변을 정리합니다 |
-| **공고** | 공고 수집기(사람인·자소설닷컴·인디스워크)가 모아 온 공고를 훑어보고, 마음에 드는 공고를 자기소개서로 옮깁니다 |
+| **공고** | 공고 수집기(사람인·자소설닷컴·인디스워크)가 모아 온 공고를 훑어보고, 마음에 드는 공고를 자기소개서로 옮깁니다. 직무·경력·스택 칩으로 필터링 규칙을 고르면 수집기가 그대로 거릅니다 |
 | **캘린더** | 마감일과 전형 일정을 한 달 달력으로 봅니다 |
 
 **스택** Next.js 15 (App Router) · TypeScript · Tailwind CSS v4 · Supabase (Postgres + Auth) · Vercel
@@ -77,13 +77,13 @@ npm install
 
 ## 3. 테이블 만들기
 
-테이블 열 개와 보안 정책(RLS)을 SQL 한 번으로 만듭니다.
+테이블 열한 개와 보안 정책(RLS)을 SQL 한 번으로 만듭니다.
 
 1. 레포의 [`supabase/schema.sql`](supabase/schema.sql) 파일을 열어 내용을 **전부** 복사합니다.
 2. Supabase 왼쪽 메뉴의 **SQL Editor**로 들어갑니다.
 3. 빈 쿼리 창에 붙여 넣고 오른쪽 아래 **Run**을 누릅니다.
    `Success. No rows returned`가 나오면 성공입니다.
-4. 왼쪽 메뉴 **Table Editor**에 아래 열 개가 보이는지 확인합니다.
+4. 왼쪽 메뉴 **Table Editor**에 아래 열한 개가 보이는지 확인합니다.
 
 | 테이블 | 담는 것 |
 |---|---|
@@ -97,6 +97,7 @@ npm install
 | `topics` | 면접 주제 |
 | `interview_questions` | 면접 질문·키워드·답변 |
 | `job_postings` | 수집한 채용 공고 |
+| `job_rules` | 공고 필터링 규칙 (직무·경력·스택) |
 
 모든 테이블에 RLS(Row Level Security)가 켜져 있어서, 로그인한 사람은 **자기 행만** 읽고 쓸 수 있습니다.
 로그인하지 않은 요청은 어떤 테이블에도 접근하지 못합니다.
@@ -189,35 +190,41 @@ Supabase 쪽에는 따로 할 일이 없습니다 — 메일을 보내지 않는
 그 밖의 사이트는 공고 주소를 직접 넣을 수 있습니다.
 
 ```
-collect (모으기) → pick (고르기) → enrich (상세 채우기, 선택) → import (앱에 넣기)
+앱에서 필터링 규칙 고르기 → collect (모으면서 거르기) → enrich (상세 채우기, 선택) → import (앱에 넣기)
 ```
 
-처음 한 번은 설정 파일을 만들고, 검색 조건과 거르기 키워드를 내 것으로 고칩니다.
+**처음 한 번만**
 
-```bash
-cp scripts/sources.example.json scripts/sources.json
-```
+1. 설정 파일을 만들고, 검색 주소와 근무 지역을 내 것으로 고칩니다.
 
-그다음부터는 이 순서로 돌립니다.
+   ```bash
+   cp scripts/sources.example.json scripts/sources.json
+   ```
+
+2. 앱의 **공고** 탭 맨 위 **필터링 규칙**에서 직무(프론트엔드·백엔드), 경력(신입·경력),
+   스택(Java·React …) 칩을 눌러 고릅니다. 누르면 바로 저장되고, 수집기가 이걸 읽어 거릅니다.
+3. `.env.local`에 `STUDY_NOTE_EMAIL`·`STUDY_NOTE_PASSWORD`를 적어 둡니다(5단계). 적지 않으면
+   돌릴 때마다 터미널에서 묻습니다.
+
+**그다음부터는 이 순서로 돌립니다.**
 
 ```bash
 node scripts/collect.mjs
-node scripts/pick.mjs
-node scripts/enrich.mjs scripts/out/picked-<날짜>.json
-node scripts/import.mjs scripts/out/picked-<날짜>.json
+node scripts/enrich.mjs scripts/out/postings-<날짜>.json
+node scripts/import.mjs scripts/out/postings-<날짜>.json
 ```
 
 | 명령 | 하는 일 |
 |---|---|
-| `collect.mjs` | `sources.json`에 적은 사이트에서 공고 목록을 모아 `scripts/out/postings-<날짜>.json`에 쌓는다. 두 번째부터는 지난번 이후에 새로 뜬 것만 모은다 |
-| `pick.mjs` | 키워드로 걸러 `picked-<날짜>.json`을 만든다. AI 코딩 도구에 골라 달라고 해도 된다 |
-| `enrich.mjs` | 고른 공고만 열어 자소서 문항·전형 조건·회사 평판을 채운다. 건너뛰어도 된다 |
+| `collect.mjs` | `sources.json`에 적은 사이트에서 공고 목록을 모으고, 앱에서 고른 필터링 규칙으로 걸러 `scripts/out/postings-<날짜>.json`에 쌓는다. 두 번째부터는 지난번 이후에 새로 뜬 것만 모은다 |
+| `enrich.mjs` | 공고를 하나씩 열어 자소서 문항·전형 조건·회사 평판을 채운다. 건너뛰어도 된다 |
 | `import.mjs` | 앱과 같은 계정으로 로그인해서 공고를 넣는다. 이미 넣은 공고는 건너뛴다 |
 
+넣기 전에 AI 코딩 도구에 "이 파일에서 지원할 만한 것만 골라 줘"라고 부탁해 더 줄여도 됩니다.
 넣은 뒤 앱을 새로고침하면 **공고** 탭에 보입니다.
 
-**설정 방법, 키워드 고르는 법, AI로 고르는 프롬프트, 사이트별 차이, 잡플래닛 평판 붙이기는
-[docs/job-collector.md](docs/job-collector.md)에 단계별로 있습니다.**
+**검색 주소 정하는 법, 필터링 규칙이 거르는 방식, AI로 고르는 프롬프트, 사이트별 차이, 잡플래닛
+평판 붙이기는 [docs/job-collector.md](docs/job-collector.md)에 단계별로 있습니다.**
 
 > 수집기는 각 사이트의 robots.txt를 지키고, 요청 사이에 1.5초씩 쉽니다. 개인이 하루 한두 번
 > 돌리는 정도로 써 주세요. 사이트 구조가 바뀌면 수집이 안 될 수 있습니다.
@@ -247,7 +254,8 @@ node scripts/export-materials.mjs --final  # 재료는 "최종"으로 고른 것
 | `이메일 확인이 끝나지 않은 계정이다` | 4단계의 Auto Confirm User?를 껐습니다. Users에서 그 사용자를 지우고 다시 만듭니다 |
 | 오랜만에 들어갔더니 접속이 안 된다 | 무료 플랜 Supabase 프로젝트는 7일쯤 안 쓰면 일시 정지됩니다. 대시보드에서 프로젝트를 열고 **Resume project**를 누릅니다. 데이터는 그대로 남아 있습니다 |
 | Vercel 빌드가 `No Output Directory named "public"`으로 실패 | 프레임워크가 Next.js로 안 잡혔습니다. 레포에 `vercel.json`이 있는지, 프로젝트 Settings의 Output Directory를 손으로 덮어쓰지 않았는지 봅니다 |
-| `import.mjs`가 `로그인 실패` | `.env.local`의 `STUDY_NOTE_EMAIL`·`STUDY_NOTE_PASSWORD`가 4단계 계정과 같은지 봅니다 |
+| `collect.mjs`·`import.mjs`가 `로그인 실패` | `.env.local`의 `STUDY_NOTE_EMAIL`·`STUDY_NOTE_PASSWORD`가 4단계 계정과 같은지 봅니다 |
+| 수집했는데 공고가 너무 적다 | 필터링 규칙이 세게 걸렀을 수 있습니다. 결과 파일의 `excluded`에서 빠진 이유(`excluded_by`)를 보고 공고 탭에서 칩을 다시 고릅니다 |
 | `collect.mjs`가 `sources.json 이 없다` | `cp scripts/sources.example.json scripts/sources.json` |
 | 수집 결과가 0건 | 검색 주소가 틀렸거나 사이트 구조가 바뀌었습니다. [docs/job-collector.md](docs/job-collector.md) 참고 |
 

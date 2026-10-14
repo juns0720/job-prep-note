@@ -5,14 +5,13 @@
 서버도 크론도 LLM API도 쓰지 않는다.
 
 ```
-scripts/sources.json           무엇을 모을지 (검색 주소·직무 코드·거르기 기준)
-      ↓  node scripts/collect.mjs        1. 목록만 훑는다 (가볍다)
-scripts/out/postings-<날짜>.json  긁어온 것 전부
-      ↓  node scripts/pick.mjs           2. 키워드로 고른다 (AI와 같이 골라도 된다)
-scripts/out/picked-<날짜>.json    고른 것만
-      ↓  node scripts/enrich.mjs <파일>  3. 고른 것만 깊게 판다 (선택)
-      ↓                                     자소서 문항 · 전형 조건 · 회사 평판
-      ↓  node scripts/import.mjs <파일>  4. 앱에 넣는다
+scripts/sources.json           무엇을 모을지 (검색 주소·직무 코드·근무 지역)
+앱 공고 화면의 필터링 규칙     무엇을 거를지 (직무·경력·스택 칩)
+      ↓  node scripts/collect.mjs        목록을 훑고 필터링 규칙으로 먼저 거른다
+scripts/out/postings-<날짜>.json  규칙을 넘은 것(items) + 규칙에 걸린 것(excluded, 이유와 같이)
+      ↓  (선택) 더 골라낸다 — 손으로 또는 AI와 같이
+      ↓  node scripts/enrich.mjs <파일>  (선택) 자소서 문항 · 전형 조건 · 회사 평판을 채운다
+      ↓  node scripts/import.mjs <파일>  앱에 넣는다
 Supabase job_postings          앱의 공고 탭에서 본다
 ```
 
@@ -27,8 +26,9 @@ README의 1~5단계(설치, Supabase, 계정, `.env.local`)를 먼저 끝낸다.
 cp scripts/sources.example.json scripts/sources.json
 ```
 
-`.env.local`에 앱 로그인 계정을 적어 두면 넣을 때마다 묻지 않는다(적지 않으면
-`import.mjs`가 터미널에서 묻는다. 비밀번호는 화면에 찍히지 않는다).
+수집기는 필터링 규칙을 읽고 공고를 넣으려고 앱과 같은 계정으로 로그인한다. `.env.local`에
+앱 로그인 계정을 적어 두면 돌릴 때마다 묻지 않는다(적지 않으면 터미널에서 묻는다.
+비밀번호는 화면에 찍히지 않는다).
 
 ```
 STUDY_NOTE_EMAIL=앱에 로그인하는 이메일
@@ -37,13 +37,12 @@ STUDY_NOTE_PASSWORD=앱에 로그인하는 비밀번호
 
 ## 1. 무엇을 모을지 정하기 — `scripts/sources.json`
 
-예시 파일은 "백엔드 개발 신입"을 찾는 설정이다. 직무가 다르면 검색 주소와 키워드를
+예시 파일은 "백엔드 개발 신입"을 찾는 설정이다. 직무가 다르면 검색 주소와 직무 코드를
 자기 것으로 바꾼다.
 
 ```json
 {
   "regions": [],
-  "pick": { "include": [...], "exclude": [...], "newcomerOnly": true },
   "targets": [ { "site": "saramin", ... }, ... ]
 }
 ```
@@ -51,7 +50,6 @@ STUDY_NOTE_PASSWORD=앱에 로그인하는 비밀번호
 | 키 | 뜻 |
 |---|---|
 | `regions` | 남길 근무 지역. `["서울", "경기"]`처럼 적으면 근무지가 이걸로 시작하지 않는 공고를 뺀다. 비우면 전국 |
-| `pick` | `pick.mjs`가 쓰는 거르기 기준. 2단계에서 설명한다 |
 | `targets` | 수집할 대상 목록. 사이트마다 하나씩, 같은 사이트를 여러 번 넣어도 된다 |
 
 `targets`의 공통 키는 이렇다.
@@ -145,7 +143,33 @@ STUDY_NOTE_PASSWORD=앱에 로그인하는 비밀번호
 }
 ```
 
-## 2. 수집 — `node scripts/collect.mjs`
+## 2. 필터링 규칙 고르기 — 앱의 공고 화면
+
+사람인은 검색어로 이미 좁혀 오지만, 자소설닷컴과 인디스워크는 직무까지만 좁혀지고 기술
+스택은 제목에 안 나온다. 그래서 수집기가 한 번 더 거른다. 기준은 앱의 **공고** 탭 맨 위
+**필터링 규칙**에서 칩을 눌러 고른다. 누르면 바로 저장되고(DB의 `job_rules`), 다음 수집부터
+수집기가 읽어 간다.
+
+| 갈래 | 고를 수 있는 것 | 공고의 어디서 찾나 |
+|---|---|---|
+| 직무 | 프론트엔드 · 백엔드 | 제목 |
+| 경력 | 신입 · 경력 | 경력 조건 + 제목 |
+| 스택 | 고른 직무의 스택 (백엔드: Java·Spring·Kotlin·Node.js·Python·Go·PHP·.NET / 프론트엔드: React·Vue·Angular·TypeScript·Next.js) | 제목 + 분야 |
+
+갈래마다 이렇게 거른다.
+
+- 아무것도 안 골랐으면 거르지 않는다.
+- 공고에 그 갈래의 말이 하나도 없으면 남긴다. 직무·스택이 안 적힌 공채는 열어 봐야 안다.
+- 말이 있는데 고른 것이 하나도 없으면 뺀다. "프론트/백엔드", "Java/Python"처럼 고른 것과
+  안 고른 것이 섞여 있으면 남긴다.
+
+분야(사람인의 직무 칸)에는 백엔드 공고에도 React 같은 프론트 스택이 흔히 끼어서, 분야에서는
+고른 직무의 스택만 본다.
+
+항목과 그걸 알아보는 낱말은 `lib/job-filter.json`에 있다. 직무나 스택을 더하고 싶으면 이
+파일에 항목을 넣으면 화면의 칩과 수집기가 같이 바뀐다. 맞춰 보는 방식은 `scripts/lib/rules.mjs`에 있다.
+
+## 3. 수집 — `node scripts/collect.mjs`
 
 ```bash
 node scripts/collect.mjs                 # 지난번 이후에 올라온 것만
@@ -155,6 +179,15 @@ node scripts/collect.mjs --only jasoseol # 한 사이트만
 
 결과는 `scripts/out/postings-<날짜>.json`에 쌓인다.
 
+```json
+{ "collected_at": "…", "count": 106, "rules": { … }, "items": [ … ], "excluded": [ … ] }
+```
+
+`items`가 규칙을 넘은 공고이고, `excluded`는 규칙에 걸려 뺀 것이다. 하나하나에 `excluded_by`
+("직무 프론트엔드", "경력만 뽑는다", "스택 Python")로 이유가 붙는다. 규칙이 너무 세게 걸렀는지
+볼 때 훑는다. 로그인이 안 되거나 규칙을 고른 적이 없으면 거르지 않고 전부 `items`에 남긴다.
+앱에 들어가는 것은 `items`뿐이다.
+
 **그냥 돌리면 지난번 수집 이후에 새로 뜬 공고만 모인다.** 언제까지 봤는지는
 `scripts/state.json`에 사이트별로 남는다. 처음부터 다시 보고 싶으면 `--all`을 쓰거나
 `scripts/state.json`을 지운다.
@@ -163,53 +196,17 @@ node scripts/collect.mjs --only jasoseol # 한 사이트만
 - 사람인은 검색 결과에 올라온 시각이 없어서 매번 전부 긁는다. 이미 넣어둔 공고는
   임포터가 걸러내므로 중복으로 쌓이지는 않는다.
 
-## 3. 고르기
+## 4. 더 골라내기 (선택)
 
-수집한 공고를 전부 넣으면 목록이 금방 묻힌다. 지원할 만한 것만 추려
-`scripts/out/picked-<날짜>.json`으로 만든다. 두 가지 방법이 있고 섞어 써도 된다.
+규칙으로 거른 `items`를 그대로 넣어도 된다. 그래도 목록이 길면 넣기 전에 더 줄인다.
+줄인 결과는 `scripts/out/picked-<날짜>.json`처럼 따로 저장해 두면 원본과 헷갈리지 않는다.
 
-### 방법 A. 키워드로 거르기 — `node scripts/pick.mjs`
+### AI와 같이 고르기
 
-```bash
-node scripts/pick.mjs                    # out/ 에서 가장 최근 postings 파일
-node scripts/pick.mjs <파일>             # 파일을 골라서
-node scripts/pick.mjs --show-dropped     # 뺀 공고와 이유도 본다
-```
-
-기준은 `sources.json`의 `pick`에 적는다.
-
-```json
-"pick": {
-  "include": ["백엔드", "서버", "개발자", "웹개발"],
-  "exclude": ["프론트", "iOS", "QA"],
-  "newcomerOnly": true
-}
-```
-
-| 키 | 동작 |
-|---|---|
-| `include` | 제목이나 직무 칸에 하나라도 있어야 남긴다. 비우면 전부 통과 |
-| `exclude` | **제목에** 하나라도 있으면 뺀다 |
-| `newcomerOnly` | 경력만 뽑는 공고를 뺀다. 경력 칸이 "신입·경력"이면 남기고 "경력 3년↑"이면 뺀다. 경력 칸이 빈 사이트는 제목에 "경력"만 있고 "신입"이 없을 때만 뺀다 |
-
-- 대소문자는 가리지 않는다.
-- 직무 칸에 담기는 것은 사이트마다 다르다. 사람인은 직무·스택, 자소설닷컴은 직무 이름
-  (`웹개발`, `응용프로그래머` …), 인디스워크는 태그(`IT개발` …)다. 그래서 예시의
-  `include`에는 사이트별 직무 이름도 들어 있다.
-- `exclude`를 제목에서만 찾는 이유: 사람인은 직무 칸에 "백엔드, 프론트엔드, 풀스택"처럼
-  여러 직무를 한꺼번에 적어서, 직무 칸까지 보면 백엔드 공고도 빠진다.
-- `exclude`는 깐깐하다. "프론트/백엔드 개발자 채용"처럼 제목에 둘 다 있으면 빠진다.
-  `--show-dropped`로 뺀 것을 한 번 훑어보고 키워드를 다듬는다.
-
-남긴 공고마다 걸린 키워드가 `note`에 적힌다. 앱의 공고 상세에서 메모로 보인다.
-
-### 방법 B. AI와 같이 고르기
-
-키워드로는 "스택이 안 맞는 공고" 같은 걸 거르기 어렵다. Claude Code 같은 AI 코딩
-도구가 있으면 이 레포를 연 상태에서 이렇게 부탁하면 된다.
+Claude Code 같은 AI 코딩 도구가 있으면 이 레포를 연 상태에서 이렇게 부탁하면 된다.
 
 ```
-scripts/out/postings-2026-10-14.json 을 읽고 내가 지원할 만한 공고만 골라서
+scripts/out/postings-2026-10-14.json 의 items를 읽고 내가 지원할 만한 공고만 골라서
 scripts/out/picked-2026-10-14.json 으로 저장해줘.
 
 찾는 것: <직무·경력·지역·스택을 적는다. 예: 백엔드 신입, 지역 무관, Python이나 Go>
@@ -218,23 +215,21 @@ scripts/out/picked-2026-10-14.json 으로 저장해줘.
 - 원하지 않는 스택 전용이면 뺀다
 - 직무나 스택이 안 적힌 통합 공채는 남긴다 (열어 봐야 안다)
 
-파일 모양은 원본과 같게 { "items": [...] } 로 두고, 항목은 고치지 말고 고르기만 한다.
+파일 모양은 { "items": [...] } 로 두고, 항목은 고치지 말고 고르기만 한다.
 고른 이유는 각 항목의 note에 한 줄로 적는다. picked는 false로 둔다.
 ```
-
-`pick.mjs`로 한 번 거른 `picked-*.json`을 AI에게 더 줄여 달라고 해도 된다.
 
 ### 손으로 고를 때 지킬 것
 
 - 파일 모양은 `{ "items": [ ... ] }`(또는 배열 그대로)다. 항목 하나는 수집 결과의 것 그대로다.
 - **`picked`는 `false`로 둔다.** 앱에서 `picked`는 "자기소개서로 옮김"이라는 뜻이라,
   `true`로 넣으면 대기가 아니라 옮김에 들어간다.
-- 고른 이유는 `note`에 적는다.
+- 고른 이유를 `note`에 적으면 앱의 공고 상세에서 메모로 보인다.
 
-## 4. 상세 채우기 — `node scripts/enrich.mjs` (선택)
+## 5. 상세 채우기 — `node scripts/enrich.mjs` (선택)
 
 ```bash
-node scripts/enrich.mjs scripts/out/picked-2026-10-14.json
+node scripts/enrich.mjs scripts/out/postings-2026-10-14.json
 node scripts/enrich.mjs <파일> --no-company   # 회사 평판은 건너뛴다
 ```
 
@@ -247,7 +242,7 @@ node scripts/enrich.mjs <파일> --no-company   # 회사 평판은 건너뛴다
 - **회사 평판** — 잡플래닛 평점·회사 평균 연봉·규모. 어느 사이트 공고든 회사명만 있으면 붙인다.
 
 공고 하나에 요청이 두세 번 나가서, 50건이면 몇 분 걸린다. 수집 때마다 할 일이 아니라
-따로 뗀 단계다. 건너뛰고 바로 4단계로 가도 된다.
+따로 뗀 단계다. 건너뛰고 바로 6단계로 가도 된다.
 
 ### 회사 평판에는 잡플래닛 쿠키가 필요하다
 
@@ -270,10 +265,11 @@ JOBPLANET_COOKIE=복사한 값 그대로
 잦아서, 받아온 회사명이 공고의 회사명과 이어지지 않으면 버린다. 영문 약자 사명은
 잡플래닛이 한글 법인명으로 들고 있어서 자동으로는 못 잇는다. 그런 회사는 링크로 직접 본다.
 
-## 5. 앱에 넣기 — `node scripts/import.mjs`
+## 6. 앱에 넣기 — `node scripts/import.mjs`
 
 ```bash
-node scripts/import.mjs scripts/out/picked-2026-10-14.json
+node scripts/import.mjs                       # out/ 에서 가장 최근 파일
+node scripts/import.mjs scripts/out/postings-2026-10-14.json
 node scripts/import.mjs <파일> --update   # 이미 있는 공고도 덮어쓴다
 ```
 
@@ -303,10 +299,11 @@ RLS가 그대로 걸린 채로 들어간다 — 내 계정의 공고로만 들�
 
 ```bash
 node scripts/collect.mjs
-node scripts/pick.mjs
-node scripts/enrich.mjs scripts/out/picked-<날짜>.json   # 선택
-node scripts/import.mjs scripts/out/picked-<날짜>.json
+node scripts/enrich.mjs scripts/out/postings-<날짜>.json   # 선택
+node scripts/import.mjs scripts/out/postings-<날짜>.json
 ```
+
+더 골라냈다면 `postings-<날짜>.json` 대신 골라낸 파일을 넘긴다.
 
 ## 상대 서버에 대한 태도
 

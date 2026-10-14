@@ -1,11 +1,12 @@
 import type { Database } from "@/lib/supabase/types";
-import type { Company, CompanyEvent, CompanyInfo, JobPosting, JobProcess, JobQuestion, MaterialGroup, Project, Topic } from "@/lib/types";
+import type { Company, CompanyEvent, CompanyInfo, JobPosting, JobProcess, JobQuestion, JobRules, MaterialGroup, Project, Topic } from "@/lib/types";
 
 type CompanyRow = Database["public"]["Tables"]["companies"]["Row"];
 type CoverQuestionRow = Database["public"]["Tables"]["cover_questions"]["Row"];
 type TopicRow = Database["public"]["Tables"]["topics"]["Row"];
 type InterviewQuestionRow = Database["public"]["Tables"]["interview_questions"]["Row"];
 type JobPostingRow = Database["public"]["Tables"]["job_postings"]["Row"];
+type JobRulesRow = Database["public"]["Tables"]["job_rules"]["Row"];
 type MaterialGroupRow = Database["public"]["Tables"]["material_groups"]["Row"];
 type MaterialRow = Database["public"]["Tables"]["materials"]["Row"];
 type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
@@ -63,6 +64,10 @@ export function mapTopicRow(row: TopicRow, questions: InterviewQuestionRow[]): T
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((q) => ({ id: q.id, t: q.body, k: q.keywords, a: q.answer })),
   };
+}
+
+export function mapJobRulesRow(row: JobRulesRow): JobRules {
+  return { roles: row.roles ?? [], careers: row.careers ?? [], stacks: row.stacks ?? [] };
 }
 
 export function mapJobPostingRow(row: JobPostingRow): JobPosting {

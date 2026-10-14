@@ -11,7 +11,11 @@
  *
  * 무엇을 모을지는 scripts/sources.json 에 적는다(sources.example.json 을 복사해서 만든다).
  * 결과는 scripts/out/postings-<날짜>.json 에 쌓인다(커밋하지 않는다).
- * 그다음 scripts/pick.mjs 로 고르고, scripts/import.mjs 로 앱에 넣는다.
+ * 그다음 그 파일을 훑어보고(필요하면 더 골라내고) scripts/import.mjs 로 앱에 넣는다.
+ *
+ * 앱의 공고 화면에서 고른 필터링 규칙으로 먼저 거른다(lib/rules.mjs). 걸린 공고는
+ * 결과 파일의 excluded에 이유와 같이 남는다. 규칙을 읽으려고 import.mjs 와 같은 계정으로
+ * 로그인한다. 로그인이 안 되면 규칙 없이 전부 남긴다.
  *
  * 상대 서버를 배려하는 부분은 lib/fetch.mjs(요청 간격)와 lib/robots.mjs에 있다.
  */
@@ -20,6 +24,8 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { applyRules, loadRules } from "./lib/rules.mjs";
+import { signIn } from "./lib/session.mjs";
 import { lastRunOf, loadState, saveState } from "./lib/state.mjs";
 import * as saramin from "./lib/adapters/saramin.mjs";
 import * as jasoseol from "./lib/adapters/jasoseol.mjs";
@@ -71,6 +77,20 @@ function inRegions(item, regions) {
   return regions.some((r) => location.startsWith(r));
 }
 
+/** 앱에 저장해 둔 규칙. 못 읽으면 null — 수집은 멈추지 않는다. */
+async function fetchRules() {
+  try {
+    const { supabase } = await signIn();
+    const rules = await loadRules(supabase);
+    await supabase.auth.signOut();
+    if (!rules) log("앱에 저장한 규칙이 없다. 거르지 않고 전부 남긴다.");
+    return rules;
+  } catch (e) {
+    log(`! 규칙을 못 읽어 거르지 않고 전부 남긴다: ${e?.message ?? e}`);
+    return null;
+  }
+}
+
 async function main() {
   const onlyIndex = process.argv.indexOf("--only");
   const only = onlyIndex >= 0 ? process.argv[onlyIndex + 1] : null;
@@ -97,6 +117,8 @@ async function main() {
     return;
   }
 
+  const rules = await fetchRules();
+
   const collected = [];
   const done = new Set();
   for (const target of targets) {
@@ -120,9 +142,14 @@ async function main() {
   }
 
   const unique = dedupe(collected);
-  const items = unique.filter((item) => inRegions(item, sources.regions));
-  if (items.length < unique.length) {
-    log(`\n근무지가 ${sources.regions.join("·")} 밖인 ${unique.length - items.length}건은 뺐다.`);
+  const inArea = unique.filter((item) => inRegions(item, sources.regions));
+  if (inArea.length < unique.length) {
+    log(`\n근무지가 ${sources.regions.join("·")} 밖인 ${unique.length - inArea.length}건은 뺐다.`);
+  }
+
+  const { kept: items, excluded } = rules ? applyRules(inArea, rules) : { kept: inArea, excluded: [] };
+  if (excluded.length > 0) {
+    log(`필터링 규칙에 걸린 ${excluded.length}건은 뺐다(결과 파일의 excluded에 이유와 같이 남는다).`);
   }
 
   const outDir = join(here, "out");
@@ -133,14 +160,17 @@ async function main() {
 
   await writeFile(
     outPath,
-    JSON.stringify({ collected_at: new Date().toISOString(), count: items.length, items }, null, 2),
+    JSON.stringify(
+      { collected_at: new Date().toISOString(), count: items.length, rules, items, excluded },
+      null,
+      2,
+    ),
     "utf-8",
   );
 
   log(`\n모두 ${items.length}건. ${outPath}`);
-  log("다음 순서로 이어 간다.");
-  log("  node scripts/pick.mjs            키워드로 고르고 (picked-<날짜>.json)");
-  log("  node scripts/enrich.mjs <파일>   자소서 문항·전형 조건을 채우고");
+  log("다음 순서로 이어 간다(더 골라내고 싶으면 그 전에 파일을 줄인다).");
+  log("  node scripts/enrich.mjs <파일>   자소서 문항·전형 조건을 채우고 (선택)");
   log("  node scripts/import.mjs <파일>   앱에 넣는다.");
 }
 

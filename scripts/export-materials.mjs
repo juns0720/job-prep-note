@@ -14,59 +14,14 @@
  * 결과 파일은 scripts/out/ 이라 커밋되지 않는다.
  */
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
-import { createInterface } from "node:readline/promises";
-import { stdin, stdout } from "node:process";
 import { fileURLToPath } from "node:url";
-import { createClient } from "@supabase/supabase-js";
+
+import { signIn } from "./lib/session.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
-
-/** .env.local 을 읽는다. 따옴표와 주석만 걷어내는 최소 파서다. */
-async function loadEnv() {
-  let text;
-  try {
-    text = await readFile(join(root, ".env.local"), "utf-8");
-  } catch {
-    throw new Error(".env.local 이 없다. README.md 5단계를 보고 만든다.");
-  }
-
-  const env = {};
-  for (const line of text.split(/\r?\n/)) {
-    const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)$/.exec(line);
-    if (!m) continue;
-    let value = m[2].trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-    env[m[1]] = value;
-  }
-  return env;
-}
-
-/** 터미널에서 한 줄 받는다. silent면 입력한 글자가 화면에 찍히지 않는다. */
-async function ask(question, { silent = false } = {}) {
-  if (!stdin.isTTY) {
-    throw new Error(
-      "물어볼 수가 없다(터미널이 아니다). .env.local 에 STUDY_NOTE_EMAIL·STUDY_NOTE_PASSWORD 를 적거나 환경 변수로 준다.",
-    );
-  }
-  const rl = createInterface({ input: stdin, output: stdout, terminal: true });
-  if (silent) {
-    rl._writeToOutput = (chunk) => {
-      if (chunk.includes(question)) rl.output.write(chunk);
-    };
-  }
-  const answer = await rl.question(question);
-  if (silent) rl.output.write("\n");
-  rl.close();
-  return answer.trim();
-}
 
 async function select(supabase, table, columns, order) {
   let query = supabase.from(table).select(columns);
@@ -155,23 +110,7 @@ async function main() {
   const toStdout = args.includes("-");
   const onlyFinal = args.includes("--final");
 
-  const env = await loadEnv();
-  for (const key of ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"]) {
-    if (!env[key]) throw new Error(`.env.local 에 ${key} 가 없다.`);
-  }
-
-  const email = env.STUDY_NOTE_EMAIL || process.env.STUDY_NOTE_EMAIL || (await ask("이메일: "));
-  const password =
-    env.STUDY_NOTE_PASSWORD ||
-    process.env.STUDY_NOTE_PASSWORD ||
-    (await ask("비밀번호: ", { silent: true }));
-  if (!email || !password) throw new Error("이메일과 비밀번호가 있어야 한다.");
-
-  const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
-    auth: { persistSession: false },
-  });
-  const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-  if (signInError) throw new Error(`로그인 실패: ${signInError.message}`);
+  const { supabase } = await signIn();
 
   const [groups, allMaterials, companies, coverQuestions, topics, interviewQuestions] =
     await Promise.all([

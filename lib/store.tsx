@@ -19,6 +19,7 @@ import { mergeFresh } from "./refresh";
 import * as coverQuestionActions from "./actions/cover-questions";
 import * as interviewQuestionActions from "./actions/interview-questions";
 import * as jobActions from "./actions/job-postings";
+import * as jobRuleActions from "./actions/job-rules";
 import * as materialActions from "./actions/materials";
 import * as periodActions from "./actions/periods";
 import * as projectActions from "./actions/projects";
@@ -28,7 +29,7 @@ import { toDateOrNull } from "./date";
 import { isStage, isSubmitted } from "./status";
 import { toTab, type Tab } from "./tab";
 import { bottomOrder, newId, topOrder } from "./text";
-import type { Company, CompanyEvent, CompanyStatus, EventKind, JobPosting, MaterialGroup, Period, Project, Topic } from "./types";
+import type { Company, CompanyEvent, CompanyStatus, EventKind, JobPosting, JobRules, MaterialGroup, Period, Project, Topic } from "./types";
 
 /**
  * 각 액션은 화면을 먼저(낙관적으로) 바꾸고, 그 뒤에 Supabase 서버 액션(lib/actions/*)을 불러 같은 내용을 저장한다.
@@ -84,6 +85,7 @@ export type InitialData = {
   materialGroups: MaterialGroup[];
   projects: Project[];
   jobs: JobPosting[];
+  jobRules: JobRules | null;
 };
 
 export type InitialView = {
@@ -213,6 +215,9 @@ type Store = {
   restoreJob: (id: string) => void;
   setJobNote: (id: string, note: string) => void;
   addJobToCover: (job: JobPosting) => void;
+  /** 공고 필터링 규칙. 수집기가 읽어 간다. 저장한 적이 없으면 null */
+  jobRules: JobRules | null;
+  saveJobRules: (rules: JobRules) => void;
 
   // 답변 접기
   closed: Record<string, boolean>;
@@ -303,6 +308,7 @@ export function StudyNoteProvider({
   // 마감이 급한 것부터 보는 편이 쓸모 있어서 이쪽을 기본으로 둔다.
   const [jobSort, setJobSort] = useState<JobSort>("due");
   const [jobSource, setJobSource] = useState<JobSource>("all");
+  const [jobRules, setJobRules] = useState<JobRules | null>(initial.jobRules);
 
   const [closed, setClosed] = useState<Record<string, boolean>>({});
 
@@ -335,8 +341,8 @@ export function StudyNoteProvider({
   const saveQueue = saveQueueRef.current;
 
   // 새로 읽기(아래 effect)가 시작할 때의 화면 데이터. 비동기로 읽는 동안 바뀌었는지 비교한다.
-  const latest = useRef({ periodList, companies, topics, materialGroups, projects, jobs, newQ });
-  latest.current = { periodList, companies, topics, materialGroups, projects, jobs, newQ };
+  const latest = useRef({ periodList, companies, topics, materialGroups, projects, jobs, jobRules, newQ });
+  latest.current = { periodList, companies, topics, materialGroups, projects, jobs, jobRules, newQ };
 
   useEffect(() => {
     let hiddenAt = document.visibilityState === "hidden" ? Date.now() : 0;
@@ -373,8 +379,9 @@ export function StudyNoteProvider({
         setMaterialGroups((prev) => (prev === start.materialGroups ? merged.materialGroups : prev));
         setProjects((prev) => (prev === start.projects ? merged.projects : prev));
         setJobs((prev) => (prev === start.jobs ? merged.jobs : prev));
+        setJobRules((prev) => (prev === start.jobRules ? merged.jobRules : prev));
         const now = latest.current;
-        const skipped = (["periodList", "companies", "topics", "materialGroups", "projects", "jobs"] as const).some(
+        const skipped = (["periodList", "companies", "topics", "materialGroups", "projects", "jobs", "jobRules"] as const).some(
           (k) => now[k] !== start[k],
         );
         if (skipped) later(attempt);
@@ -965,6 +972,11 @@ export function StudyNoteProvider({
         created.catch((e) => console.error("회사 추가 실패", e));
         jobActions.updateJobPosting(job.id, { picked: true }).catch((e) => console.error("공고 저장 실패", e));
       },
+      jobRules,
+      saveJobRules: (rules) => {
+        setJobRules(rules);
+        jobRuleActions.saveJobRules(rules).catch((e) => console.error("필터링 규칙 저장 실패", e));
+      },
 
       closed,
       toggleAnswer: (qId, open) => setClosed((prev) => ({ ...prev, [qId]: open })),
@@ -982,7 +994,7 @@ export function StudyNoteProvider({
     editQ, newQ, qDraft, closed,
     materialGroups, groupId, editGroup, groupDraft,
     projects,
-    jobs, jobId, jobView, jobSort, jobSource,
+    jobs, jobId, jobView, jobSort, jobSource, jobRules,
     mapCompany, mapTopic, mapJob, mapGroup, saveQueue,
   ]);
 

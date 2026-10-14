@@ -1,0 +1,29 @@
+{
+  "roles": [
+    { "id": "frontend", "label": "프론트엔드", "words": ["프론트엔드", "프론트", "frontend", "front-end", "퍼블리셔", "풀스택", "fullstack", "full-stack"] },
+    { "id": "backend", "label": "백엔드", "words": ["백엔드", "backend", "back-end", "서버", "server", "풀스택", "fullstack", "full-stack"] }
+  ],
+  "careers": [
+    { "id": "entry", "label": "신입", "words": ["신입", "인턴", "무관", "주니어", "junior"] },
+    { "id": "experienced", "label": "경력", "words": ["경력"] }
+  ],
+  "stacks": {
+    "backend": [
+      { "id": "Java", "words": ["java", "자바"], "ignore": ["javascript", "자바스크립트"] },
+      { "id": "Spring", "words": ["spring", "스프링"] },
+      { "id": "Kotlin", "words": ["kotlin", "코틀린"] },
+      { "id": "Node.js", "words": ["node.js", "nodejs", "nestjs"] },
+      { "id": "Python", "words": ["python", "파이썬", "django", "fastapi"] },
+      { "id": "Go", "words": ["golang", "go언어"], "whole": ["go"] },
+      { "id": "PHP", "words": ["php", "laravel"] },
+      { "id": ".NET", "words": [".net", "c#", "asp.net"] }
+    ],
+    "frontend": [
+      { "id": "React", "words": ["react", "리액트"] },
+      { "id": "Vue", "words": ["vue"] },
+      { "id": "Angular", "words": ["angular"] },
+      { "id": "TypeScript", "words": ["typescript"] },
+      { "id": "Next.js", "words": ["next.js", "nextjs"] }
+    ]
+  }
+}
