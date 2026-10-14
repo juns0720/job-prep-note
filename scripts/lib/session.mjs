@@ -28,7 +28,7 @@ export async function loadEnv() {
   try {
     text = await readFile(join(root, ".env.local"), "utf-8");
   } catch {
-    throw new Error(".env.local 이 없다. README.md 5단계를 보고 만든다.");
+    throw new Error(".env.local 이 없다. docs/job-collector.md의 '처음 사용하기'를 참고한다.");
   }
 
   const env = {};

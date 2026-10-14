@@ -6,7 +6,7 @@
     "페이지 번호는 수집기가 알아서 넘긴다. pages는 몇 쪽까지 읽을지다(최대 10).",
     "잠시 빼고 싶으면 지우지 말고 enabled를 false로 둔다.",
     "site가 manual이면 url 대신 urls 배열에 공고 주소를 직접 넣는다.",
-    "site가 jasoseol이면 url 없이 months(몇 달치)와 dutyGroups(직무 코드)를 쓴다. 코드표는 docs/job-collector.md 에 있다.",
+    "site가 jasoseol이면 url 없이 months(몇 달치)와 dutyGroups(직무 코드)를 쓴다. 직무 코드는 scripts/lib/adapters/jasoseol.mjs의 DUTY_NAMES를 참고한다.",
     "site가 inthiswork이면 url 없이 tag(직무 태그 이름)와 categories(신입/인턴, 주니어경력)를 쓴다. 사이트에 보이는 이름 그대로 적는다.",
     "regions는 남길 근무 지역이다(예: [\"서울\", \"경기\"]). 비워 두면 전국. 지역이 비어 있는 공고(자소설·인디스워크)는 항상 남긴다.",
     "직무·경력·스택으로 거르는 규칙은 이 파일이 아니라 앱의 공고 화면에서 고른다. 수집기가 그 규칙을 읽어 간다."
