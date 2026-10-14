@@ -1,0 +1,47 @@
+{
+  "_설명": [
+    "이 파일을 scripts/sources.json 으로 복사해서 자기 조건으로 고친다. sources.json 은 커밋되지 않는다.",
+    "아래 값은 '백엔드 개발 신입'을 찾는 예시다. 직무가 다르면 검색 주소와 키워드를 바꾼다.",
+    "사람인처럼 url을 쓰는 곳은 사이트에서 원하는 조건으로 검색한 뒤 그 주소를 그대로 붙여넣는다.",
+    "페이지 번호는 수집기가 알아서 넘긴다. pages는 몇 쪽까지 읽을지다(최대 10).",
+    "잠시 빼고 싶으면 지우지 말고 enabled를 false로 둔다.",
+    "site가 manual이면 url 대신 urls 배열에 공고 주소를 직접 넣는다.",
+    "site가 jasoseol이면 url 없이 months(몇 달치)와 dutyGroups(직무 코드)를 쓴다. 코드표는 docs/job-collector.md 에 있다.",
+    "site가 inthiswork이면 url 없이 tag(직무 태그 이름)와 categories(신입/인턴, 주니어경력)를 쓴다. 사이트에 보이는 이름 그대로 적는다.",
+    "regions는 남길 근무 지역이다(예: [\"서울\", \"경기\"]). 비워 두면 전국. 지역이 비어 있는 공고(자소설·인디스워크)는 항상 남긴다.",
+    "pick은 scripts/pick.mjs 가 쓰는 거르기 기준이다. include는 제목·직무에 하나라도 있어야 남기고, exclude는 제목에 하나라도 있으면 뺀다."
+  ],
+  "regions": [],
+  "pick": {
+    "include": ["백엔드", "서버", "backend", "back-end", "개발자", "웹개발", "응용프로그래머", "SW·솔루션", "IT개발"],
+    "exclude": ["프론트", "frontend", "iOS", "안드로이드", "퍼블리셔", "디자이너", "QA"],
+    "newcomerOnly": true
+  },
+  "targets": [
+    {
+      "site": "saramin",
+      "label": "백엔드 신입",
+      "url": "https://www.saramin.co.kr/zf_user/search?searchType=search&searchword=%EB%B0%B1%EC%97%94%EB%93%9C&exp_cd=1",
+      "pages": 2
+    },
+    {
+      "site": "jasoseol",
+      "label": "공채 — 개발",
+      "months": 2,
+      "dutyGroups": [162, 165, 170]
+    },
+    {
+      "site": "inthiswork",
+      "label": "IT·개발 신입/인턴",
+      "tag": "IT개발",
+      "categories": ["신입/인턴"],
+      "pages": 2
+    },
+    {
+      "site": "manual",
+      "label": "직접 모은 공고",
+      "enabled": false,
+      "urls": []
+    }
+  ]
+}
