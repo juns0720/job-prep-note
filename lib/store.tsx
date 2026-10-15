@@ -75,6 +75,8 @@ const REFRESH_AFTER_HIDDEN_MS = 30_000;
 /** 새로 읽는 사이 화면이 바뀌어 다 못 바꿨을 때 다시 읽는 간격과 횟수. */
 const REFRESH_RETRY_MS = 2_000;
 const REFRESH_ATTEMPTS = 5;
+/** 화면을 보고 있는 동안 새 배포가 나왔는지 이 간격으로 확인한다. */
+const DEPLOYMENT_CHECK_MS = 60_000;
 
 export type CompanyDraft = { name: string; role: string; due: string };
 export type QuestionDraft = { t: string; k: string; a: string };
@@ -231,10 +233,13 @@ const StudyNoteContext = createContext<Store | null>(null);
 export function StudyNoteProvider({
   initial,
   initialView,
+  deployment = "",
   children,
 }: {
   initial: InitialData;
   initialView?: InitialView;
+  /** 이 화면을 그린 배포(lib/deployment.ts). 비어 있으면 새 배포를 확인하지 않는다. */
+  deployment?: string;
   children: ReactNode;
 }) {
   const [tab, setTab] = useState<Tab>(toTab(initialView?.tab));
@@ -345,8 +350,8 @@ export function StudyNoteProvider({
   const coOrigin = useRef<CompanyDraft | null>(null);
   const nameOrigin = useRef("");
   const qOrigin = useRef<{ t: string; k: string[]; a: string } | null>(null);
-  // `+ 질문 추가`로 연 질문은 처음 쓸 때 DB에 만든다. 만드는 요청을 id별로 들고 있는다.
-  const newQRows = useRef(new Map<string, Promise<unknown>>());
+  // `+ 질문 추가`로 연 질문은 처음 쓸 때 DB에 만든다. 만들기를 보낸 질문의 id.
+  const newQRows = useRef(new Set<string>());
 
   // 새로 읽기(아래 effect)가 시작할 때의 화면 데이터. 비동기로 읽는 동안 바뀌었는지 비교한다.
   const latest = useRef({ periodList, companies, topics, materialGroups, projects, jobs, jobRules, newQ });
@@ -438,6 +443,50 @@ export function StudyNoteProvider({
     };
   }, [saveQueue]);
 
+  // 새로 배포되면 열어 둔 화면은 옛 코드로 계속 돈다. 옛 코드의 서버 액션(지우기 등)은 새 배포에서
+  // 찾지 못해 실패하고, 그사이 고친 동작도 이 화면에는 없다. 새 배포를 알아채면 저장할 것이 다
+  // 나간 뒤 페이지를 새로 불러온다. 쓰는 도중에 화면이 바뀌지 않도록, 화면에 다시 돌아왔을 때나
+  // 입력 칸에 커서가 없을 때만 불러온다.
+  useEffect(() => {
+    if (!deployment) return;
+    let stale = false;
+
+    const check = async () => {
+      if (stale) return;
+      try {
+        const res = await fetch("/api/version", { cache: "no-store", redirect: "error" });
+        if (!res.ok) return;
+        const { deployment: now } = (await res.json()) as { deployment: string };
+        if (now && now !== deployment) stale = true;
+      } catch {
+        // 네트워크가 끊겼으면 다음에 다시 본다.
+      }
+    };
+
+    const reloadIfStale = (evenIfFocused: boolean) => {
+      if (!stale || document.visibilityState !== "visible" || !saveQueue.idle()) return;
+      const el = document.activeElement;
+      const focused = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
+      if (focused && !evenIfFocused) return;
+      window.location.reload();
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      void check().then(() => reloadIfStale(true));
+    };
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void check().then(() => reloadIfStale(false));
+    }, DEPLOYMENT_CHECK_MS);
+
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [deployment, saveQueue]);
+
   const mapCompany = useCallback(
     (id: string, fn: (c: Company) => Company) =>
       setCompanies((prev) => prev.map((c) => (c.id === id ? fn(c) : c))),
@@ -465,23 +514,21 @@ export function StudyNoteProvider({
   const value = useMemo<Store>(() => {
     /** 새 질문을 DB에 만든다. 목록 맨 아래 순서로 만든다 — 편집을 마치면 거기로 옮긴다. */
     const createNewQuestion = (tId: string, qId: string, fields: { t: string; k: string[]; a: string }) => {
-      const created = interviewQuestionActions.createInterviewQuestion({
-        id: qId,
-        topicId: tId,
-        ...fields,
-        sortOrder: bottomOrder(),
+      newQRows.current.add(qId);
+      saveQueue.create("interviewQuestion", qId, {
+        topic_id: tId,
+        body: fields.t,
+        keywords: fields.k,
+        answer: fields.a,
+        sort_order: bottomOrder(),
       });
-      newQRows.current.set(qId, created);
-      saveQueue.trackCreate([qId], created);
-      created.catch((e) => console.error("질문 추가 실패", e));
     };
 
     /** 새 질문을 없앤다. 쓰다가 DB에 만들어졌으면 만들기가 끝난 뒤 지운다. */
     const dropNewQuestion = (qId: string) => {
-      const created = newQRows.current.get(qId);
-      newQRows.current.delete(qId);
-      created
-        ?.then(() => interviewQuestionActions.removeInterviewQuestion(qId))
+      if (!newQRows.current.delete(qId)) return;
+      saveQueue
+        .afterCreate(qId, () => interviewQuestionActions.removeInterviewQuestion(qId))
         .catch((e) => console.error("질문 삭제 실패", e));
     };
 
@@ -636,7 +683,7 @@ export function StudyNoteProvider({
         if (!window.confirm(`${c.name} 지원 기록을 지울까?`)) return;
         setCompanies((prev) => prev.filter((x) => x.id !== c.id));
         setEditCo(null);
-        companyActions.removeCompany(c.id).catch((e) => console.error("회사 삭제 실패", e));
+        saveQueue.afterCreate(c.id, () => companyActions.removeCompany(c.id)).catch((e) => console.error("회사 삭제 실패", e));
       },
       addCompany: () => {
         const id = newId();
@@ -662,9 +709,7 @@ export function StudyNoteProvider({
         setDetail(false); // 이름을 먼저 고치게 되므로 목록 화면에 머문다.
         setCoDraftState({ name: "새 회사", role: "직무", due: "" });
         coOrigin.current = { name: "새 회사", role: "직무", due: "" };
-        const created = companyActions.createCompany({ id, period, name: "새 회사", role: "직무" });
-        saveQueue.trackCreate([id], created);
-        created.catch((e) => console.error("회사 추가 실패", e));
+        saveQueue.create("company", id, { period, name: "새 회사", role: "직무" });
       },
       setCompanyField: (id, key, v) => {
         mapCompany(id, (c) => ({ ...c, [key]: v }));
@@ -690,9 +735,7 @@ export function StudyNoteProvider({
         const kind: EventKind = status && isStage(status) && status !== "docs_passed" ? status : "coding_test";
         // 날짜를 고르기 전이라 목록 맨 뒤(날짜 미정 자리)에 붙는다.
         mapCompany(companyId, (c) => ({ ...c, events: [...c.events, { id, kind, date: "", memo: "" }] }));
-        const created = companyEventActions.createCompanyEvent({ id, companyId, kind });
-        saveQueue.trackCreate([id], created);
-        created.catch((e) => console.error("일정 추가 실패", e));
+        saveQueue.create("companyEvent", id, { company_id: companyId, kind });
       },
       setCompanyEvent: (companyId, eventId, patch) => {
         // 날짜를 바꿔도 줄 순서는 그대로 둔다. 고치는 도중에 줄이 움직이면 엉뚱한 칸을 누르게 된다.
@@ -706,7 +749,7 @@ export function StudyNoteProvider({
       removeCompanyEvent: (companyId, eventId) => {
         if (!window.confirm("이 일정을 지울까?")) return;
         mapCompany(companyId, (c) => ({ ...c, events: c.events.filter((ev) => ev.id !== eventId) }));
-        companyEventActions.removeCompanyEvent(eventId).catch((e) => console.error("일정 삭제 실패", e));
+        saveQueue.afterCreate(eventId, () => companyEventActions.removeCompanyEvent(eventId)).catch((e) => console.error("일정 삭제 실패", e));
       },
 
       coverView,
@@ -720,14 +763,11 @@ export function StudyNoteProvider({
           ...c,
           questions: [...c.questions, { id, t: "", limit: DEFAULT_CHAR_LIMIT, a: "" }],
         }));
-        const created = coverQuestionActions.createCoverQuestion({
-          id,
-          companyId,
-          charLimit: DEFAULT_CHAR_LIMIT,
-          sortOrder: bottomOrder(),
+        saveQueue.create("coverQuestion", id, {
+          company_id: companyId,
+          char_limit: DEFAULT_CHAR_LIMIT,
+          sort_order: bottomOrder(),
         });
-        saveQueue.trackCreate([id], created);
-        created.catch((e) => console.error("문항 추가 실패", e));
       },
       setCoverQuestion: (companyId, questionId, patch) => {
         mapCompany(companyId, (c) => ({
@@ -739,7 +779,9 @@ export function StudyNoteProvider({
       removeCoverQuestion: (companyId, questionId) => {
         if (!window.confirm("이 문항을 지울까?")) return;
         mapCompany(companyId, (c) => ({ ...c, questions: c.questions.filter((q) => q.id !== questionId) }));
-        coverQuestionActions.removeCoverQuestion(questionId).catch((e) => console.error("문항 삭제 실패", e));
+        saveQueue
+          .afterCreate(questionId, () => coverQuestionActions.removeCoverQuestion(questionId))
+          .catch((e) => console.error("문항 삭제 실패", e));
       },
 
       topics,
@@ -777,7 +819,7 @@ export function StudyNoteProvider({
         setTopics(left);
         setEditTopic(null);
         if (topicId === t.id) setTopicId(left[0] ? left[0].id : "");
-        topicActions.removeTopic(t.id).catch((e) => console.error("주제 삭제 실패", e));
+        saveQueue.afterCreate(t.id, () => topicActions.removeTopic(t.id)).catch((e) => console.error("주제 삭제 실패", e));
       },
       addTopic: () => {
         const id = newId();
@@ -787,9 +829,7 @@ export function StudyNoteProvider({
         setTopicDraftState("새 주제");
         nameOrigin.current = "새 주제";
         setDetail(false);
-        const created = topicActions.createTopic({ id, name: "새 주제", sortOrder: bottomOrder() });
-        saveQueue.trackCreate([id], created);
-        created.catch((e) => console.error("주제 추가 실패", e));
+        saveQueue.create("topic", id, { name: "새 주제", sort_order: bottomOrder() });
       },
 
       editQ,
@@ -902,7 +942,7 @@ export function StudyNoteProvider({
         setMaterialGroups(left);
         setEditGroup(null);
         if (groupId === g.id) setGroupId(left[0] ? left[0].id : "");
-        materialActions.removeMaterialGroup(g.id).catch((e) => console.error("컨셉 삭제 실패", e));
+        saveQueue.afterCreate(g.id, () => materialActions.removeMaterialGroup(g.id)).catch((e) => console.error("컨셉 삭제 실패", e));
       },
       addGroup: () => {
         // 면접 준비의 주제 추가와 같다. 이름을 먼저 고치게 되므로 목록 화면에 머문다.
@@ -913,18 +953,14 @@ export function StudyNoteProvider({
         setGroupDraftState("새 컨셉");
         nameOrigin.current = "새 컨셉";
         setDetail(false);
-        const created = materialActions.createMaterialGroup({ id, name: "새 컨셉", sortOrder: bottomOrder() });
-        saveQueue.trackCreate([id], created);
-        created.catch((e) => console.error("컨셉 추가 실패", e));
+        saveQueue.create("materialGroup", id, { name: "새 컨셉", sort_order: bottomOrder() });
       },
 
       addMaterial: (gId) => {
         if (!gId) return;
         const id = newId();
         mapGroup(gId, (g) => ({ ...g, items: [...g.items, { id, title: "", t: "", final: false }] }));
-        const created = materialActions.createMaterial({ id, groupId: gId, sortOrder: bottomOrder() });
-        saveQueue.trackCreate([id], created);
-        created.catch((e) => console.error("재료 추가 실패", e));
+        saveQueue.create("material", id, { group_id: gId, sort_order: bottomOrder() });
       },
       setMaterial: (gId, id, patch) => {
         mapGroup(gId, (g) => ({ ...g, items: g.items.map((m) => (m.id === id ? { ...m, ...patch } : m)) }));
@@ -933,7 +969,7 @@ export function StudyNoteProvider({
       removeMaterial: (gId, id) => {
         if (!window.confirm("이 문항을 지울까?")) return;
         mapGroup(gId, (g) => ({ ...g, items: g.items.filter((m) => m.id !== id) }));
-        materialActions.removeMaterial(id).catch((e) => console.error("재료 삭제 실패", e));
+        saveQueue.afterCreate(id, () => materialActions.removeMaterial(id)).catch((e) => console.error("재료 삭제 실패", e));
       },
       moveMaterial: (gId, id, step) => {
         const items = materialGroups.find((g) => g.id === gId)?.items ?? [];
@@ -952,14 +988,12 @@ export function StudyNoteProvider({
         // 맨 아래에 빈 카드를 붙인다. 이름도 그 카드에서 바로 고친다.
         const id = newId();
         setProjects((prev) => [...prev, { id, name: "새 프로젝트", description: "", keywords: "" }]);
-        const created = projectActions.createProject({ id, name: "새 프로젝트", sortOrder: bottomOrder() });
-        saveQueue.trackCreate([id], created);
-        created.catch((e) => console.error("프로젝트 추가 실패", e));
+        saveQueue.create("project", id, { name: "새 프로젝트", sort_order: bottomOrder() });
       },
       removeProject: (p) => {
         if (!window.confirm(`${p.name || "이름 없는"} 프로젝트를 지울까?`)) return;
         setProjects((prev) => prev.filter((x) => x.id !== p.id));
-        projectActions.removeProject(p.id).catch((e) => console.error("프로젝트 삭제 실패", e));
+        saveQueue.afterCreate(p.id, () => projectActions.removeProject(p.id)).catch((e) => console.error("프로젝트 삭제 실패", e));
       },
       setProject: (id, patch) => {
         setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
@@ -1037,24 +1071,23 @@ export function StudyNoteProvider({
         // 넘겼는지 나중에 확인할 수 있고, 다시 수집해도 되살아나지 않는다.
         mapJob(job.id, (j) => ({ ...j, picked: true }));
         if (jobId === job.id) setJobId("");
-        const created = companyActions
-          .createCompany({
-            id,
-            period,
-            name: job.company || job.title,
-            role,
-            url: job.applyUrl || job.url,
-            due: job.due || null,
-            memo: job.note,
-          })
-          .then(() =>
-            coverQuestionActions.createCoverQuestions(
-              id,
-              questions.map((q) => ({ id: q.id, body: q.t, charLimit: q.limit, sortOrder: q.sortOrder })),
-            ),
-          );
-        saveQueue.trackCreate([id, ...questions.map((q) => q.id)], created);
-        created.catch((e) => console.error("회사 추가 실패", e));
+        // 큐는 넣은 순서대로 만든다. 회사가 먼저 만들어져야 문항이 붙는다.
+        saveQueue.create("company", id, {
+          period,
+          name: job.company || job.title,
+          role,
+          url: job.applyUrl || job.url,
+          due: job.due || null,
+          memo: job.note,
+        });
+        questions.forEach((q) =>
+          saveQueue.create("coverQuestion", q.id, {
+            company_id: id,
+            body: q.t,
+            char_limit: q.limit,
+            sort_order: q.sortOrder,
+          }),
+        );
         jobActions.updateJobPosting(job.id, { picked: true }).catch((e) => console.error("공고 저장 실패", e));
       },
       jobRules,

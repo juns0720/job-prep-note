@@ -8,8 +8,9 @@ import type { InitialData } from "./store";
  * pending  저장 큐에서 아직 확인 못 받은 대상(`${kind}:${id}`)
  * newQ     면접 준비에서 방금 추가해 편집 중인 질문. 맨 위 편집 칸 자리에 그대로 둔다
  *
- * 추가·삭제처럼 서버 액션으로 저장하는 것은 fresh를 그대로 따른다.
- * 서버 액션은 순서대로 나가므로 새로 읽기 전에 부른 것은 이미 fresh에 들어 있다.
+ * 삭제처럼 서버 액션으로 저장하는 것은 fresh를 그대로 따른다. 서버 액션은 순서대로 나가므로
+ * 새로 읽기 전에 부른 것은 이미 fresh에 들어 있다. 새 행은 저장 큐가 만드는데, 만드는 중이면
+ * store가 새로 읽기를 미룬다.
  */
 export function mergeFresh(fresh: InitialData, local: InitialData, pending: Set<string>, newQ: string | null): InitialData {
   const keep = (kind: string, id: string) => pending.has(`${kind}:${id}`);

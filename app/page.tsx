@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { SetupNotice } from "@/components/SetupNotice";
 import { loadUserData } from "@/lib/data/queries";
+import { DEPLOYMENT } from "@/lib/deployment";
 import { StudyNoteProvider, type InitialView } from "@/lib/store";
 import { toTab } from "@/lib/tab";
 import { supabaseConfigured } from "@/lib/supabase/env";
@@ -46,7 +47,7 @@ export default async function Page({ searchParams }: { searchParams: SearchParam
   };
 
   return (
-    <StudyNoteProvider initial={data} initialView={initialView}>
+    <StudyNoteProvider initial={data} initialView={initialView} deployment={DEPLOYMENT}>
       <AppShell userEmail={user.email ?? ""} />
     </StudyNoteProvider>
   );

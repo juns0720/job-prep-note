@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { SaveItem, SaveKind, SaveStatus } from "@/lib/save-queue";
+import type { CreateItem, CreateKind, SaveItem, SaveKind, SaveStatus } from "@/lib/save-queue";
 
 /**
  * app/api/save가 받은 저장 항목 하나를 DB에 반영한다.
@@ -93,4 +93,36 @@ export async function saveItem(
     return "error";
   }
   return row ? "stale" : "missing";
+}
+
+/** kind마다 새 행을 넣는 테이블과 화면이 채워 보낼 수 있는 칸. 바디는 클라이언트가 보낸 것이라 여기 없는 칸은 버린다. */
+const CREATE_KINDS: Record<CreateKind, { table: string; columns: string[] }> = {
+  company: { table: "companies", columns: ["period", "name", "role", "url", "due", "memo"] },
+  coverQuestion: { table: "cover_questions", columns: ["company_id", "body", "char_limit", "sort_order"] },
+  companyEvent: { table: "company_events", columns: ["company_id", "kind"] },
+  topic: { table: "topics", columns: ["name", "sort_order"] },
+  interviewQuestion: { table: "interview_questions", columns: ["topic_id", "body", "keywords", "answer", "sort_order"] },
+  materialGroup: { table: "material_groups", columns: ["name", "sort_order"] },
+  material: { table: "materials", columns: ["group_id", "sort_order"] },
+  project: { table: "projects", columns: ["name", "sort_order"] },
+};
+
+/** Postgres foreign_key_violation. 부모 행(회사·주제·컨셉)이 이미 지워졌다. */
+const FK_VIOLATION = "23503";
+
+/**
+ * 새 행 하나를 만든다. 큐는 실패하면 다시 보내고 페이지를 가릴 때도 한 번 더 보내므로 같은 id가
+ * 여러 번 올 수 있다. 이미 있으면 아무것도 바꾸지 않고 ok를 돌려준다 — 그 사이 저장된 값을
+ * 처음 값으로 덮지 않는다.
+ */
+export async function createItem(db: SupabaseClient, userId: string, item: CreateItem): Promise<SaveStatus> {
+  const kind = CREATE_KINDS[item.kind];
+  const row: Record<string, unknown> = { id: item.id, user_id: userId };
+  for (const column of kind.columns) {
+    if (column in item.row) row[column] = item.row[column];
+  }
+  const { error } = await db.from(kind.table).upsert(row, { onConflict: "id", ignoreDuplicates: true });
+  if (!error) return "ok";
+  console.error(`만들기 실패: ${item.kind}:${item.id}`, error);
+  return error.code === FK_VIOLATION ? "missing" : "error";
 }
