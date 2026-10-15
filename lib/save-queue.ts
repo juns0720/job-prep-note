@@ -19,7 +19,16 @@ import { newId } from "./text";
  *   두 번 가도 괜찮다. 그 행의 update는 만들기가 끝난 뒤에 보낸다 — 먼저 가면 고칠 행이 없다.
  * - 페이지를 떠나거나 가려지면 만들 행과 확인 못 받은 값을 keepalive 요청 하나로 한 번 더
  *   보낸다. 서버는 만들기를 먼저 끝내고 update를 반영한다.
+ * - 지금 상태(저장 중·저장됨·실패)를 헤더에 보여 준다(subscribe·status). 헤더의 [저장]은
+ *   기다리지 않고 남은 것을 전부 다시 보낸다(saveNow).
  */
+
+/**
+ * saved  서버가 전부 받았다
+ * saving 보내는 중이거나 보낼 것이 남았다
+ * failed 저장이 실패해 다시 보내려고 기다린다. 이대로 페이지를 닫으면 값을 잃는다
+ */
+export type SaveState = "saved" | "saving" | "failed";
 
 export type SaveKind =
   | "company"
@@ -109,6 +118,20 @@ export function createSaveQueue() {
   let creatingNow = false;
   let failures = 0;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  const listeners = new Set<() => void>();
+
+  const state = (): SaveState => {
+    if (entries.size === 0 && creates.size === 0) return "saved";
+    return failures > 0 ? "failed" : "saving";
+  };
+  let lastState: SaveState = "saved";
+  /** 상태가 바뀌었으면 헤더에 알린다. 값을 넣거나 응답을 받을 때마다 부른다. */
+  const notify = () => {
+    const next = state();
+    if (next === lastState) return;
+    lastState = next;
+    listeners.forEach((l) => l());
+  };
 
   const unsent = (e: Entry) => [...e.fields.values()].some((f) => f.seq > e.sentSeq);
 
@@ -166,10 +189,12 @@ export function createSaveQueue() {
 
   const onSuccess = () => {
     failures = 0;
+    notify();
   };
 
   const scheduleRetry = () => {
     failures += 1;
+    notify();
     if (retryTimer) return;
     const delay = Math.min(RETRY_MAX, 1000 * 2 ** (failures - 1));
     retryTimer = setTimeout(retryNow, delay);
@@ -198,6 +223,7 @@ export function createSaveQueue() {
       }
     } finally {
       creatingNow = false;
+      notify();
     }
   };
 
@@ -228,6 +254,30 @@ export function createSaveQueue() {
       }
     } finally {
       inFlight.delete(key);
+      notify();
+    }
+  };
+
+  /** 만들 행과 확인 못 받은 값을 요청 하나에 전부 담아 보낸다(flush·saveNow). */
+  const sendAll = async (keepalive: boolean) => {
+    const createItems = [...creates.values()].map((p) => p.item);
+    const sent = [...entries].map(([key, e]) => ({ key, item: build(e) }));
+    if (createItems.length === 0 && sent.length === 0) return;
+    try {
+      // 탭만 옮긴 경우에는 페이지가 살아 있으니 응답을 받아 정리한다.
+      const { created, results } = await post({ tab, creates: createItems, items: sent.map((s) => s.item) }, keepalive);
+      let retry = settleCreates(createItems, created);
+      sent.forEach(({ key, item }, i) => {
+        const next = settle(key, item, results[i]);
+        if (next === "resend") void drain(key);
+        if (next === "retry") retry = true;
+      });
+      if (retry) scheduleRetry();
+      else onSuccess();
+    } catch (err) {
+      console.error("저장 실패: 한꺼번에 보낸 값", err);
+      sent.forEach(({ key, item }) => settle(key, item, "failed"));
+      scheduleRetry();
     }
   };
 
@@ -244,6 +294,7 @@ export function createSaveQueue() {
       let resolve = () => {};
       const done = new Promise<void>((r) => (resolve = r));
       creates.set(id, { item: { kind, id, row }, done, resolve });
+      notify();
       void sendCreates();
     },
 
@@ -255,6 +306,7 @@ export function createSaveQueue() {
         entries.set(key, e);
       }
       for (const [k, value] of Object.entries(patch)) e.fields.set(k, { value, seq: ++seq });
+      notify();
       void drain(key);
     },
 
@@ -276,31 +328,23 @@ export function createSaveQueue() {
      * 가도 서버가 id와 번호로 걸러낸다.
      */
     flush() {
-      const createItems = [...creates.values()].map((p) => p.item);
-      const sent = [...entries].map(([key, e]) => ({ key, item: build(e) }));
-      if (createItems.length === 0 && sent.length === 0) return;
-      // 탭만 옮긴 경우에는 페이지가 살아 있으니 응답을 받아 정리한다.
-      post({ tab, creates: createItems, items: sent.map((s) => s.item) }, true).then(
-        ({ created, results }) => {
-          let retry = settleCreates(createItems, created);
-          sent.forEach(({ key, item }, i) => {
-            const next = settle(key, item, results[i]);
-            if (next === "resend") void drain(key);
-            if (next === "retry") retry = true;
-          });
-          if (retry) scheduleRetry();
-          else onSuccess();
-        },
-        (err) => {
-          console.error("저장 실패: 페이지를 가리며 보낸 값", err);
-          sent.forEach(({ key, item }) => settle(key, item, "failed"));
-          scheduleRetry();
-        },
-      );
+      void sendAll(true);
     },
 
-    /** 저장이 실패해 다시 보내려고 기다리는 값이 있는지. 이때 페이지를 닫으면 값을 잃는다. */
-    hasFailed: () => failures > 0 && (entries.size > 0 || creates.size > 0),
+    /** 헤더의 [저장]. 기다리던 재시도까지 지금 전부 보낸다. 서버가 전부 받았으면 true. */
+    async saveNow() {
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = null;
+      await sendAll(false);
+      return state() === "saved";
+    },
+
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => void listeners.delete(listener);
+    },
+
+    status: (): SaveState => lastState,
 
     /** 서버가 아직 받았다고 답하지 않은 것이 하나라도 있는지. 없을 때만 페이지를 새로 불러도 된다. */
     idle: () => entries.size === 0 && creates.size === 0,

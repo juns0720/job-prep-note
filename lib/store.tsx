@@ -8,13 +8,14 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import * as authActions from "./actions/auth";
 import * as companyActions from "./actions/companies";
 import * as companyEventActions from "./actions/company-events";
 import * as dataActions from "./actions/data";
-import { createSaveQueue } from "./save-queue";
+import { createSaveQueue, type SaveState } from "./save-queue";
 import { mergeFresh } from "./refresh";
 import * as coverQuestionActions from "./actions/cover-questions";
 import * as interviewQuestionActions from "./actions/interview-questions";
@@ -113,6 +114,11 @@ type Store = {
   goCalendar: () => void;
   backToSide: () => void;
   signOut: () => void;
+
+  // 저장 상태 — 헤더에 보인다
+  saveState: SaveState;
+  /** 헤더의 [저장]. 남은 것을 지금 전부 보낸다. 서버가 전부 받았으면 true */
+  saveNow: () => Promise<boolean>;
 
   // 지원 시기
   period: Period;
@@ -345,6 +351,7 @@ export function StudyNoteProvider({
   const saveQueueRef = useRef<ReturnType<typeof createSaveQueue> | null>(null);
   if (!saveQueueRef.current) saveQueueRef.current = createSaveQueue();
   const saveQueue = saveQueueRef.current;
+  const saveState = useSyncExternalStore(saveQueue.subscribe, saveQueue.status, () => "saved" as const);
 
   // 편집 칸을 열 때의 값. 쓰는 대로 저장하므로 [취소]는 이 값으로 되돌려 다시 저장한다.
   const coOrigin = useRef<CompanyDraft | null>(null);
@@ -423,9 +430,13 @@ export function StudyNoteProvider({
       if (e.persisted) void refresh(0);
     };
     const onOnline = () => saveQueue.retry();
-    // 저장이 실패해 다시 보내려고 기다리는 값이 있으면 닫기 전에 브라우저가 한 번 묻게 한다.
+    // 서버가 아직 받았다고 답하지 않은 값이 하나라도 있으면 닫기 전에 브라우저가 한 번 묻게 한다.
+    // 남은 값은 위의 pagehide가 keepalive로 보내지만, 서버가 실패하면 그대로 사라진다.
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (saveQueue.hasFailed()) e.preventDefault();
+      if (saveQueue.idle()) return;
+      e.preventDefault();
+      // 옛 브라우저는 returnValue가 있어야 묻는다.
+      e.returnValue = "";
     };
 
     document.addEventListener("visibilitychange", onVisibility);
@@ -587,6 +598,9 @@ export function StudyNoteProvider({
       signOut: () => {
         void authActions.signOut();
       },
+
+      saveState,
+      saveNow: saveQueue.saveNow,
 
       period,
       periodList,
@@ -1105,7 +1119,7 @@ export function StudyNoteProvider({
       },
     };
   }, [
-    tab, narrow, detail,
+    tab, narrow, detail, saveState,
     period, periodList, pMode, pDraft,
     companies, coverId, editCo, coDraft, coverView, coverSort,
     topics, topicId, editTopic, topicDraft,

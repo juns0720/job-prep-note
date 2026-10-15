@@ -27,6 +27,18 @@ const ROW_KINDS: Record<Exclude<SaveKind, "materialOrder">, { table: string; fie
   job: { table: "job_postings", fields: { note: "note" } },
 };
 
+/**
+ * 순서 칸(save_tab·save_seq, order_tab·order_seq)을 만드는 마이그레이션(0011·0016)을 DB에 안
+ * 올렸는지. 실제로 0011이 빠진 채 배포돼, 모든 저장이 이 오류로 실패하고 탭을 닫으면 쓴 것이
+ * 사라졌다. 이때는 순서 확인 없이 값만이라도 저장한다.
+ *
+ * 바꿀 값에 없는 칸이 있으면 PostgREST가 PGRST204로, 조건(or)에만 있으면 Postgres가
+ * 42703(undefined_column)으로 막는다.
+ */
+function missingColumn(error: { code?: string } | null) {
+  return error?.code === "PGRST204" || error?.code === "42703";
+}
+
 /** 다른 탭이 고쳤거나, 같은 탭이 더 작은 번호로 고친 행만 고른다. tab은 라우트에서 uuid인지 확인했다. */
 function newerThanRow(prefix: "save" | "order", tab: string, seq: number) {
   return `${prefix}_tab.is.null,${prefix}_tab.neq.${tab},${prefix}_seq.lt.${seq}`;
@@ -44,16 +56,22 @@ export async function saveItem(
     // 순서가 안 바뀐다. 행마다 따로 번호를 확인하니, 옛 순서 요청이
     // 늦게 와도 새 순서를 받은 행은 그대로 남는다.
     const ids = Array.isArray(item.patch.ids) ? item.patch.ids.filter((v): v is string => typeof v === "string") : [];
-    const results = await Promise.all(
-      ids.map((id, i) =>
-        db
-          .from("materials")
-          .update({ sort_order: i, order_tab: tab, order_seq: item.seq })
-          .eq("id", id)
-          .eq("user_id", userId)
-          .or(newerThanRow("order", tab, item.seq)),
-      ),
-    );
+    const reorder = (ordered: boolean) =>
+      Promise.all(
+        ids.map((id, i) => {
+          const query = db
+            .from("materials")
+            .update(ordered ? { sort_order: i, order_tab: tab, order_seq: item.seq } : { sort_order: i })
+            .eq("id", id)
+            .eq("user_id", userId);
+          return ordered ? query.or(newerThanRow("order", tab, item.seq)) : query;
+        }),
+      );
+    let results = await reorder(true);
+    if (results.some((r) => missingColumn(r.error))) {
+      console.error("순서 칸(order_tab·order_seq)이 DB에 없다. 마이그레이션 0011을 올려야 한다.");
+      results = await reorder(false);
+    }
     const failed = results.find((r) => r.error);
     if (failed?.error) {
       console.error("재료 순서 저장 실패", failed.error);
@@ -63,23 +81,29 @@ export async function saveItem(
   }
 
   const kind = ROW_KINDS[item.kind];
-  const patch: Record<string, unknown> = { save_tab: tab, save_seq: item.seq };
+  const values: Record<string, unknown> = {};
   for (const [key, column] of Object.entries(kind.fields)) {
-    if (key in item.patch) patch[column] = item.patch[key];
+    if (key in item.patch) values[column] = item.patch[key];
   }
 
-  const { data, error } = await db
-    .from(kind.table)
-    .update(patch)
-    .eq("id", item.id)
-    .eq("user_id", userId)
-    .or(newerThanRow("save", tab, item.seq))
-    .select("id");
+  const update = (ordered: boolean) => {
+    const query = db
+      .from(kind.table)
+      .update(ordered ? { ...values, save_tab: tab, save_seq: item.seq } : values)
+      .eq("id", item.id)
+      .eq("user_id", userId);
+    return (ordered ? query.or(newerThanRow("save", tab, item.seq)) : query).select("id");
+  };
+  let { data, error } = await update(true);
+  if (missingColumn(error)) {
+    console.error(`순서 칸(save_tab·save_seq)이 ${kind.table}에 없다. 마이그레이션 0011·0016을 올려야 한다.`);
+    ({ data, error } = await update(false));
+  }
   if (error) {
     console.error(`저장 실패: ${item.kind}:${item.id}`, error);
     return "error";
   }
-  if (data.length > 0) return "ok";
+  if (data && data.length > 0) return "ok";
 
   // 아무 행도 안 바뀌었다. 더 새 요청이 먼저 들어갔는지, 행이 아예 없는지 가른다.
   const { data: row, error: findError } = await db
