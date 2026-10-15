@@ -9,7 +9,8 @@ const EMPTY: Rules = { roles: [], careers: [], stacks: [] };
 
 /**
  * 공고 필터링 규칙. 누르면 바로 저장된다. 수집기(scripts/collect.mjs)가 읽어 거르고,
- * 맞추는 방식은 scripts/lib/rules.mjs에 있다. 스택은 고른 직무의 줄만 보여준다.
+ * 맞추는 방식은 scripts/lib/rules.mjs에 있다. 스택은 고른 직무의 줄만 보여주고,
+ * 스택을 두지 않은 직무(AX·인프라)는 줄이 없다.
  */
 export function JobRules() {
   const s = useStudyNote();
@@ -22,7 +23,9 @@ export function JobRules() {
 
   const stackRows = filter.roles
     .filter((r) => rules.roles.includes(r.id))
-    .map((r) => ({ label: r.label, options: filter.stacks[r.id as keyof typeof filter.stacks] ?? [] }));
+    .map((r) => ({ label: r.label, options: filter.stacks[r.id as keyof typeof filter.stacks] ?? [] }))
+    // AX·인프라처럼 스택을 두지 않은 직무는 줄을 만들지 않는다.
+    .filter((row) => row.options.length > 0);
 
   return (
     <div className="mb-16">

@@ -1,7 +1,9 @@
 {
   "roles": [
     { "id": "frontend", "label": "프론트엔드", "words": ["프론트엔드", "프론트", "frontend", "front-end", "퍼블리셔", "풀스택", "fullstack", "full-stack"] },
-    { "id": "backend", "label": "백엔드", "words": ["백엔드", "backend", "back-end", "서버", "server", "풀스택", "fullstack", "full-stack"] }
+    { "id": "backend", "label": "백엔드", "words": ["백엔드", "backend", "back-end", "서버", "server", "풀스택", "fullstack", "full-stack"] },
+    { "id": "ax", "label": "AX", "words": ["llm", "agent", "에이전트", "생성형", "genai", "mlops", "머신러닝", "machine learning", "딥러닝", "deep learning", "인공지능"], "whole": ["ai", "ax", "ml", "rag"] },
+    { "id": "infra", "label": "인프라", "words": ["인프라", "infra", "클라우드", "cloud", "devops", "데브옵스", "운영", "idc", "전산", "시스템 엔지니어", "system engineer", "플랫폼 엔지니어", "platform engineer", "데이터 엔지니어", "data engineer"], "whole": ["aws", "sre"] }
   ],
   "careers": [
     { "id": "entry", "label": "신입", "words": ["신입", "인턴", "무관", "주니어", "junior"] },
