@@ -50,6 +50,7 @@ export function CompanyRow({ company: c, picked }: { company: Company; picked: b
   const soon = isSoon(c.due);
   // 목록에서는 남은 날만 본다. 마감이 지났거나 날짜가 없으면 배지를 달지 않는다
   // (날짜 줄에 이미 "마감일 미정"이 보인다). 제출한 뒤에는 마감이 상관없으니 상태를 대신 단다.
+  // 작성 중이면 상태와 D-day를 같이 단다.
   const submitted = isSubmitted(c);
   const ddayText = !submitted && c.due && dday(c.due) !== "마감 지남" ? dday(c.due) : "";
 
@@ -95,11 +96,23 @@ export function CompanyRow({ company: c, picked }: { company: Company; picked: b
               {STATUS_LABEL[c.status]}
             </span>
           ) : (
-            ddayText && (
-              <span className="flex shrink-0">
-                <DdayBadge text={ddayText} soon={soon} variant={picked ? "namePicked" : "name"} />
-              </span>
-            )
+            <>
+              {/* 작성 중이면 상태를 달고, 아직 안 냈으니 D-day도 그 옆에 그대로 둔다. */}
+              {c.status === "writing" && (
+                <span
+                  className={`shrink-0 rounded-chip px-8 py-5 text-12 font-semibold whitespace-nowrap ${
+                    picked ? "bg-white text-accent" : "bg-accent-bg text-accent"
+                  }`}
+                >
+                  {STATUS_LABEL.writing}
+                </span>
+              )}
+              {ddayText && (
+                <span className="flex shrink-0">
+                  <DdayBadge text={ddayText} soon={soon} variant={picked ? "namePicked" : "name"} />
+                </span>
+              )}
+            </>
           )}
         </div>
         <div className={picked ? "mt-3 truncate text-12 text-picked-sub" : "mt-3 truncate text-12 text-muted"}>
