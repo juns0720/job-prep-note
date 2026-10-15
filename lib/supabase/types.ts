@@ -110,6 +110,8 @@ export type Database = {
           name: string;
           sort_order: number;
           created_at: string;
+          save_tab: string | null;
+          save_seq: number;
         };
         Insert: {
           id?: string;
@@ -120,6 +122,8 @@ export type Database = {
         Update: {
           name?: string;
           sort_order?: number;
+          save_tab?: string | null;
+          save_seq?: number;
         };
         Relationships: [];
       };
@@ -192,6 +196,8 @@ export type Database = {
           name: string;
           sort_order: number;
           created_at: string;
+          save_tab: string | null;
+          save_seq: number;
         };
         Insert: {
           id?: string;
@@ -202,6 +208,8 @@ export type Database = {
         Update: {
           name?: string;
           sort_order?: number;
+          save_tab?: string | null;
+          save_seq?: number;
         };
         Relationships: [];
       };
@@ -333,6 +341,8 @@ export type Database = {
           answer: string;
           sort_order: number;
           created_at: string;
+          save_tab: string | null;
+          save_seq: number;
         };
         Insert: {
           id?: string;
@@ -348,6 +358,8 @@ export type Database = {
           keywords?: string[];
           answer?: string;
           sort_order?: number;
+          save_tab?: string | null;
+          save_seq?: number;
         };
         Relationships: [];
       };

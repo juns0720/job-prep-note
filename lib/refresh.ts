@@ -6,9 +6,9 @@ import type { InitialData } from "./store";
  * 그 옛 값에 이어 붙어 저장되기 때문이다.
  *
  * pending  저장 큐에서 아직 확인 못 받은 대상(`${kind}:${id}`)
- * newQ     면접 준비에서 방금 추가해 아직 서버에 없는 질문. 그대로 살려 둔다
+ * newQ     면접 준비에서 방금 추가해 편집 중인 질문. 맨 위 편집 칸 자리에 그대로 둔다
  *
- * 추가·삭제·이름 바꾸기처럼 서버 액션으로 저장하는 것은 fresh를 그대로 따른다.
+ * 추가·삭제처럼 서버 액션으로 저장하는 것은 fresh를 그대로 따른다.
  * 서버 액션은 순서대로 나가므로 새로 읽기 전에 부른 것은 이미 fresh에 들어 있다.
  */
 export function mergeFresh(fresh: InitialData, local: InitialData, pending: Set<string>, newQ: string | null): InitialData {
@@ -26,11 +26,23 @@ export function mergeFresh(fresh: InitialData, local: InitialData, pending: Set<
     return { ...(l && keep("company", c.id) ? l : c), questions, events };
   });
 
-  const localTopics = local.topics.filter((t) => newQ && t.questions.some((q) => q.id === newQ));
+  const localTopics = byId(local.topics);
   const topics = fresh.topics.map((t) => {
-    const draft = localTopics.find((l) => l.id === t.id)?.questions.find((q) => q.id === newQ);
-    // 새 질문의 빈 편집 칸은 목록 맨 위에 열린다(store의 addInterviewQuestion).
-    return draft ? { ...t, questions: [draft, ...t.questions] } : t;
+    const l = localTopics.get(t.id);
+    const localQuestions = byId(l?.questions ?? []);
+    // 새 질문은 쓰다가 이미 DB에 만들어졌을 수 있다. 맨 아래 것은 빼고 편집 칸 자리(맨 위)에 둔다.
+    const questions = t.questions
+      .filter((q) => q.id !== newQ)
+      .map((q) => {
+        const lq = localQuestions.get(q.id);
+        return lq && keep("interviewQuestion", q.id) ? lq : q;
+      });
+    const draft = l?.questions.find((q) => q.id === newQ);
+    return {
+      ...t,
+      name: l && keep("topic", t.id) ? l.name : t.name,
+      questions: draft ? [draft, ...questions] : questions,
+    };
   });
 
   const localGroups = byId(local.materialGroups);
@@ -45,7 +57,7 @@ export function mergeFresh(fresh: InitialData, local: InitialData, pending: Set<
       const pos = new Map(l.items.map((m, i) => [m.id, i]));
       items = [...items].sort((a, b) => (pos.get(a.id) ?? pos.size) - (pos.get(b.id) ?? pos.size));
     }
-    return { ...g, items };
+    return { ...g, name: l && keep("materialGroup", g.id) ? l.name : g.name, items };
   });
 
   return {

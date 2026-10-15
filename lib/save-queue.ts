@@ -20,8 +20,29 @@ import { newId } from "./text";
  *   (만드는 중인 행은 빼고).
  */
 
-export type SaveKind = "company" | "coverQuestion" | "companyEvent" | "material" | "materialOrder" | "project" | "job";
-export const SAVE_KINDS: SaveKind[] = ["company", "coverQuestion", "companyEvent", "material", "materialOrder", "project", "job"];
+export type SaveKind =
+  | "company"
+  | "coverQuestion"
+  | "companyEvent"
+  | "topic"
+  | "interviewQuestion"
+  | "materialGroup"
+  | "material"
+  | "materialOrder"
+  | "project"
+  | "job";
+export const SAVE_KINDS: SaveKind[] = [
+  "company",
+  "coverQuestion",
+  "companyEvent",
+  "topic",
+  "interviewQuestion",
+  "materialGroup",
+  "material",
+  "materialOrder",
+  "project",
+  "job",
+];
 
 export type SaveItem = { kind: SaveKind; id: string; seq: number; patch: Record<string, unknown> };
 /**

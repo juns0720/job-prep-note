@@ -35,9 +35,10 @@ import type { Company, CompanyEvent, CompanyStatus, EventKind, JobPosting, JobRu
  * 각 액션은 화면을 먼저(낙관적으로) 바꾸고, 그 뒤에 Supabase 서버 액션(lib/actions/*)을 불러 같은 내용을 저장한다.
  * 저장이 실패해도 화면은 되돌리지 않는다 — 실패 표시는 아직 없고 콘솔에만 남는다.
  *
- * 타이핑마다 오는 값(회사 필드, 자소서 문항, 재료, 재료 순서, 프로젝트, 공고 메모)은 기다리지 않고
- * 바로 보낸다. 서버 액션 대신 lib/save-queue.ts의 큐로 `/api/save`에 보낸다. 큐는 실패하면
- * 다시 보내고, 요청이 뒤바뀌어 도착해도 옛 값이 새 값을 덮지 않는다 — save-queue.ts 참고.
+ * 타이핑마다 오는 값(회사 필드, 자소서 문항, 면접 질문, 주제·컨셉 이름, 재료, 재료 순서,
+ * 프로젝트, 공고 메모)은 기다리지 않고 바로 보낸다. [저장] 버튼이 있는 편집 칸도 쓰는 대로
+ * 저장하고, [취소]는 편집을 시작할 때 값으로 되돌려 다시 저장한다. 서버 액션 대신
+ * lib/save-queue.ts의 큐로 `/api/save`에 보낸다. 큐는 실패하면 다시 보내고, 요청이 뒤바뀌어 도착해도 옛 값이 새 값을 덮지 않는다 — save-queue.ts 참고.
  *
  * 오래 가려져 있던 화면이 다시 보이면 데이터를 새로 읽는다(lib/refresh.ts). 다른 탭이나
  * 기기에서 고친 것을 옛 화면에 이어 써서 덮어쓰지 않게 하려는 것이다.
@@ -340,6 +341,13 @@ export function StudyNoteProvider({
   if (!saveQueueRef.current) saveQueueRef.current = createSaveQueue();
   const saveQueue = saveQueueRef.current;
 
+  // 편집 칸을 열 때의 값. 쓰는 대로 저장하므로 [취소]는 이 값으로 되돌려 다시 저장한다.
+  const coOrigin = useRef<CompanyDraft | null>(null);
+  const nameOrigin = useRef("");
+  const qOrigin = useRef<{ t: string; k: string[]; a: string } | null>(null);
+  // `+ 질문 추가`로 연 질문은 처음 쓸 때 DB에 만든다. 만드는 요청을 id별로 들고 있는다.
+  const newQRows = useRef(new Map<string, Promise<unknown>>());
+
   // 새로 읽기(아래 effect)가 시작할 때의 화면 데이터. 비동기로 읽는 동안 바뀌었는지 비교한다.
   const latest = useRef({ periodList, companies, topics, materialGroups, projects, jobs, jobRules, newQ });
   latest.current = { periodList, companies, topics, materialGroups, projects, jobs, jobRules, newQ };
@@ -455,6 +463,48 @@ export function StudyNoteProvider({
   );
 
   const value = useMemo<Store>(() => {
+    /** 새 질문을 DB에 만든다. 목록 맨 아래 순서로 만든다 — 편집을 마치면 거기로 옮긴다. */
+    const createNewQuestion = (tId: string, qId: string, fields: { t: string; k: string[]; a: string }) => {
+      const created = interviewQuestionActions.createInterviewQuestion({
+        id: qId,
+        topicId: tId,
+        ...fields,
+        sortOrder: bottomOrder(),
+      });
+      newQRows.current.set(qId, created);
+      saveQueue.trackCreate([qId], created);
+      created.catch((e) => console.error("질문 추가 실패", e));
+    };
+
+    /** 새 질문을 없앤다. 쓰다가 DB에 만들어졌으면 만들기가 끝난 뒤 지운다. */
+    const dropNewQuestion = (qId: string) => {
+      const created = newQRows.current.get(qId);
+      newQRows.current.delete(qId);
+      created
+        ?.then(() => interviewQuestionActions.removeInterviewQuestion(qId))
+        .catch((e) => console.error("질문 삭제 실패", e));
+    };
+
+    /**
+     * 질문 편집 칸을 닫는다. 쓴 것은 이미 저장했다. 새 질문은 쓴 것이 있으면 목록 맨 아래로
+     * 옮기고, 아무것도 안 썼으면(아직 DB에 없으면) 목록에서 뺀다.
+     */
+    const leaveQuestion = () => {
+      setEditQ(null);
+      if (!newQ) return;
+      const qId = newQ;
+      setNewQ(null);
+      const keep = newQRows.current.has(qId);
+      setTopics((prev) =>
+        prev.map((t) => {
+          const target = t.questions.find((q) => q.id === qId);
+          if (!target) return t;
+          const rest = t.questions.filter((q) => q.id !== qId);
+          return { ...t, questions: keep ? [...rest, target] : rest };
+        }),
+      );
+    };
+
     return {
       tab,
       narrow,
@@ -485,7 +535,7 @@ export function StudyNoteProvider({
       },
       backToSide: () => {
         setDetail(false);
-        setEditQ(null);
+        leaveQuestion();
       },
       signOut: () => {
         void authActions.signOut();
@@ -557,22 +607,31 @@ export function StudyNoteProvider({
       coverId,
       editCo,
       coDraft,
-      setCoDraft: (patch) => setCoDraftState((prev) => ({ ...prev, ...patch })),
+      setCoDraft: (patch) => {
+        setCoDraftState((prev) => ({ ...prev, ...patch }));
+        if (!editCo) return;
+        mapCompany(editCo, (c) => ({ ...c, ...patch }));
+        saveQueue.save("company", editCo, "due" in patch ? { ...patch, due: toDateOrNull(patch.due ?? "") } : patch);
+      },
       selectCompany: (id) => {
         setCoverId(id);
         setDetail(true);
       },
       startEditCompany: (c) => {
+        const draft = { name: c.name, role: c.role, due: c.due };
         setEditCo(c.id);
-        setCoDraftState({ name: c.name, role: c.role, due: c.due });
+        setCoDraftState(draft);
+        coOrigin.current = draft;
       },
-      cancelEditCompany: () => setEditCo(null),
-      saveCompany: (id) => {
+      cancelEditCompany: () => {
         setEditCo(null);
-        mapCompany(id, (c) => ({ ...c, name: coDraft.name, role: coDraft.role, due: coDraft.due }));
-        // 마감일은 상세 화면에서도 고친다. 같은 큐로 보내야 순서가 엇갈리지 않는다.
-        saveQueue.save("company", id, { name: coDraft.name, role: coDraft.role, due: toDateOrNull(coDraft.due) });
+        const origin = coOrigin.current;
+        if (!editCo || !origin) return;
+        mapCompany(editCo, (c) => ({ ...c, ...origin }));
+        saveQueue.save("company", editCo, { ...origin, due: toDateOrNull(origin.due) });
       },
+      // 쓰는 대로 이미 저장했다(setCoDraft). 편집 칸만 닫는다.
+      saveCompany: () => setEditCo(null),
       removeCompany: (c) => {
         if (!window.confirm(`${c.name} 지원 기록을 지울까?`)) return;
         setCompanies((prev) => prev.filter((x) => x.id !== c.id));
@@ -602,6 +661,7 @@ export function StudyNoteProvider({
         setCoverView("writing"); // 새 회사는 미제출이라 작성 중 쪽에 놓인다.
         setDetail(false); // 이름을 먼저 고치게 되므로 목록 화면에 머문다.
         setCoDraftState({ name: "새 회사", role: "직무", due: "" });
+        coOrigin.current = { name: "새 회사", role: "직무", due: "" };
         const created = companyActions.createCompany({ id, period, name: "새 회사", role: "직무" });
         saveQueue.trackCreate([id], created);
         created.catch((e) => console.error("회사 추가 실패", e));
@@ -686,22 +746,31 @@ export function StudyNoteProvider({
       topicId,
       editTopic,
       topicDraft,
-      setTopicDraft: setTopicDraftState,
+      setTopicDraft: (v) => {
+        setTopicDraftState(v);
+        if (!editTopic) return;
+        mapTopic(editTopic, (t) => ({ ...t, name: v }));
+        saveQueue.save("topic", editTopic, { name: v });
+      },
       selectTopic: (id) => {
         setTopicId(id);
-        setEditQ(null);
+        leaveQuestion();
         setDetail(true);
       },
       startEditTopic: (t) => {
         setEditTopic(t.id);
         setTopicDraftState(t.name);
+        nameOrigin.current = t.name;
       },
-      cancelEditTopic: () => setEditTopic(null),
-      saveTopic: (id) => {
+      cancelEditTopic: () => {
         setEditTopic(null);
-        mapTopic(id, (t) => ({ ...t, name: topicDraft }));
-        topicActions.renameTopic(id, topicDraft).catch((e) => console.error("주제 저장 실패", e));
+        if (!editTopic) return;
+        const name = nameOrigin.current;
+        mapTopic(editTopic, (t) => ({ ...t, name }));
+        saveQueue.save("topic", editTopic, { name });
       },
+      // 쓰는 대로 이미 저장했다(setTopicDraft). 편집 칸만 닫는다.
+      saveTopic: () => setEditTopic(null),
       removeTopic: (t) => {
         if (!window.confirm(`${t.name} 주제와 질문 ${t.questions.length}개를 지울까?`)) return;
         const left = topics.filter((x) => x.id !== t.id);
@@ -716,61 +785,65 @@ export function StudyNoteProvider({
         setTopicId(id);
         setEditTopic(id);
         setTopicDraftState("새 주제");
+        nameOrigin.current = "새 주제";
         setDetail(false);
-        topicActions
-          .createTopic({ id, name: "새 주제", sortOrder: bottomOrder() })
-          .catch((e) => console.error("주제 추가 실패", e));
+        const created = topicActions.createTopic({ id, name: "새 주제", sortOrder: bottomOrder() });
+        saveQueue.trackCreate([id], created);
+        created.catch((e) => console.error("주제 추가 실패", e));
       },
 
       editQ,
       newQ,
       qDraft,
-      setQDraft: (patch) => setQDraftState((prev) => ({ ...prev, ...patch })),
+      setQDraft: (patch) => {
+        setQDraftState((prev) => ({ ...prev, ...patch }));
+        const qId = editQ;
+        if (!qId) return;
+        const { k, ...rest } = patch;
+        const fields: { t?: string; k?: string[]; a?: string } = k === undefined ? rest : { ...rest, k: parseKeywords(k) };
+        setTopics((prev) =>
+          prev.map((t) =>
+            t.questions.some((q) => q.id === qId)
+              ? { ...t, questions: t.questions.map((q) => (q.id === qId ? { ...q, ...fields } : q)) }
+              : t,
+          ),
+        );
+        // 새 질문은 처음 쓸 때 DB에 만든다. 그 뒤로 쓰는 것은 만들기가 끝난 다음 큐가 보낸다.
+        if (qId === newQ && !newQRows.current.has(qId)) {
+          const tId = topics.find((t) => t.questions.some((q) => q.id === qId))?.id;
+          if (!tId) return;
+          const draft = { ...qDraft, ...patch };
+          createNewQuestion(tId, qId, { t: draft.t, k: parseKeywords(draft.k), a: draft.a });
+          return;
+        }
+        saveQueue.save("interviewQuestion", qId, fields);
+      },
       startEditQuestion: (id, draft) => {
+        leaveQuestion();
         setEditQ(id);
         setQDraftState(draft);
+        qOrigin.current = { t: draft.t, k: parseKeywords(draft.k), a: draft.a };
       },
       cancelQuestion: (tId, qId) => {
-        // 새로 추가한 질문은 아직 서버에 없다(저장할 때 비로소 생긴다).
-        // 비운 채 취소하면 그 항목을 목록에서 없애기만 하면 된다.
+        setEditQ(null);
         if (newQ === qId) {
-          setEditQ(null);
+          // 새 질문을 취소하면 항목을 없앤다. 쓰다가 이미 만들어졌으면 DB에서도 지운다.
           setNewQ(null);
           mapTopic(tId, (t) => ({ ...t, questions: t.questions.filter((x) => x.id !== qId) }));
-        } else {
-          setEditQ(null);
+          dropNewQuestion(qId);
+          return;
         }
+        const origin = qOrigin.current;
+        if (!origin) return;
+        mapTopic(tId, (t) => ({ ...t, questions: t.questions.map((x) => (x.id === qId ? { ...x, ...origin } : x)) }));
+        saveQueue.save("interviewQuestion", qId, origin);
       },
       saveQuestion: (tId, qId) => {
-        const next = {
-          t: qDraft.t,
-          // 저장할 때 , 와 줄바꿈으로 끊고 앞뒤 공백을 지우고 빈 항목을 버린다.
-          // 같은 키워드가 두 번 들어오면 칩의 React key가 겹치므로 한 번 걸러낸다.
-          k: [...new Set(qDraft.k.split(/[,\n]/).map((v) => v.trim()).filter((v) => v))],
-          a: qDraft.a,
-        };
-        const isNew = newQ === qId;
-        setEditQ(null);
-        setNewQ(null);
-        mapTopic(tId, (t) => {
-          const target = t.questions.find((x) => x.id === qId);
-          if (!target) return t;
-          const updated = { ...target, ...next };
-          return {
-            ...t,
-            // 새 질문은 저장할 때 목록 맨 아래로 옮긴다.
-            questions: isNew
-              ? [...t.questions.filter((x) => x.id !== qId), updated]
-              : t.questions.map((x) => (x.id !== qId ? x : updated)),
-          };
-        });
-        if (isNew) {
-          interviewQuestionActions
-            .createInterviewQuestion({ id: qId, topicId: tId, ...next, sortOrder: bottomOrder() })
-            .catch((e) => console.error("질문 추가 실패", e));
-        } else {
-          interviewQuestionActions.updateInterviewQuestion(qId, next).catch((e) => console.error("질문 저장 실패", e));
+        // 쓰는 대로 이미 저장했다(setQDraft). 아무것도 안 쓰고 누른 새 질문만 여기서 만든다.
+        if (newQ === qId && !newQRows.current.has(qId)) {
+          createNewQuestion(tId, qId, { t: qDraft.t, k: parseKeywords(qDraft.k), a: qDraft.a });
         }
+        leaveQuestion();
       },
       removeQuestion: (tId, qId) => {
         if (!window.confirm("이 질문을 지울까?")) return;
@@ -778,18 +851,20 @@ export function StudyNoteProvider({
         setEditQ(null);
         if (wasNew) setNewQ(null);
         mapTopic(tId, (t) => ({ ...t, questions: t.questions.filter((x) => x.id !== qId) }));
-        // 아직 저장 전(새 질문)이면 서버에는 애초에 없으니 지울 것도 없다.
-        if (!wasNew) {
-          interviewQuestionActions.removeInterviewQuestion(qId).catch((e) => console.error("질문 삭제 실패", e));
+        if (wasNew) {
+          dropNewQuestion(qId);
+          return;
         }
+        interviewQuestionActions.removeInterviewQuestion(qId).catch((e) => console.error("질문 삭제 실패", e));
       },
       addInterviewQuestion: (tId) => {
         if (!tId) return;
+        leaveQuestion();
         const id = newId();
         setEditQ(id);
         setNewQ(id);
         setQDraftState({ t: "", k: "", a: "" });
-        // 빈 편집 칸이 목록 맨 위에 열린다. 저장 전까지는 로컬에만 있다.
+        // 빈 편집 칸이 목록 맨 위에 열린다. 처음 쓸 때 DB에 만든다.
         mapTopic(tId, (t) => ({ ...t, questions: [{ id, t: "", k: [], a: "" }, ...t.questions] }));
       },
 
@@ -797,7 +872,12 @@ export function StudyNoteProvider({
       groupId,
       editGroup,
       groupDraft,
-      setGroupDraft: setGroupDraftState,
+      setGroupDraft: (v) => {
+        setGroupDraftState(v);
+        if (!editGroup) return;
+        mapGroup(editGroup, (g) => ({ ...g, name: v }));
+        saveQueue.save("materialGroup", editGroup, { name: v });
+      },
       selectGroup: (id) => {
         setGroupId(id);
         setDetail(true);
@@ -805,13 +885,17 @@ export function StudyNoteProvider({
       startEditGroup: (g) => {
         setEditGroup(g.id);
         setGroupDraftState(g.name);
+        nameOrigin.current = g.name;
       },
-      cancelEditGroup: () => setEditGroup(null),
-      saveGroup: (id) => {
+      cancelEditGroup: () => {
         setEditGroup(null);
-        mapGroup(id, (g) => ({ ...g, name: groupDraft }));
-        materialActions.renameMaterialGroup(id, groupDraft).catch((e) => console.error("컨셉 저장 실패", e));
+        if (!editGroup) return;
+        const name = nameOrigin.current;
+        mapGroup(editGroup, (g) => ({ ...g, name }));
+        saveQueue.save("materialGroup", editGroup, { name });
       },
+      // 쓰는 대로 이미 저장했다(setGroupDraft). 편집 칸만 닫는다.
+      saveGroup: () => setEditGroup(null),
       removeGroup: (g) => {
         if (!window.confirm(`${g.name} 컨셉과 문항 ${g.items.length}개를 지울까?`)) return;
         const left = materialGroups.filter((x) => x.id !== g.id);
@@ -827,6 +911,7 @@ export function StudyNoteProvider({
         setGroupId(id);
         setEditGroup(id);
         setGroupDraftState("새 컨셉");
+        nameOrigin.current = "새 컨셉";
         setDetail(false);
         const created = materialActions.createMaterialGroup({ id, name: "새 컨셉", sortOrder: bottomOrder() });
         saveQueue.trackCreate([id], created);
@@ -999,6 +1084,11 @@ export function StudyNoteProvider({
   ]);
 
   return <StudyNoteContext.Provider value={value}>{children}</StudyNoteContext.Provider>;
+}
+
+/** 키워드 칸은 , 와 줄바꿈으로 끊고 앞뒤 공백을 지우고 빈 항목을 버린다. 같은 키워드는 칩의 React key가 겹치므로 한 번 걸러낸다. */
+function parseKeywords(raw: string): string[] {
+  return [...new Set(raw.split(/[,\n]/).map((v) => v.trim()).filter((v) => v))];
 }
 
 export function useStudyNote(): Store {

@@ -12,13 +12,6 @@ export async function createTopic(input: { id: string; name: string; sortOrder: 
   if (error) throw error;
 }
 
-export async function renameTopic(id: string, name: string) {
-  const supabase = await createClient();
-  const user = await requireUser(supabase);
-  const { error } = await supabase.from("topics").update({ name }).eq("id", id).eq("user_id", user.id);
-  if (error) throw error;
-}
-
 /** 딸린 interview_questions는 FK의 on delete cascade가 지운다. */
 export async function removeTopic(id: string) {
   const supabase = await createClient();
