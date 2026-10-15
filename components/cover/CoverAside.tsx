@@ -5,7 +5,7 @@ import { BTN_ADD, BTN_CANCEL, BTN_SAVE, INPUT_PANEL, LABEL_MINI, LIST_CARD } fro
 import { SortButton, ViewButton } from "../ui/ListToggle";
 import { isSubmitted } from "@/lib/status";
 import { useStudyNote, type CoverSort } from "@/lib/store";
-import type { Company } from "@/lib/types";
+import type { Company, CompanyStatus } from "@/lib/types";
 
 export function CoverAside() {
   const s = useStudyNote();
@@ -171,16 +171,31 @@ export function CoverAside() {
 }
 
 /**
- * 마감순은 급한 것부터, 마감일이 없는 회사는 맨 뒤로 보낸다.
- * 최신순은 최근에 추가한 회사부터.
+ * 진행 상태를 먼저 본다. 전형이 멀리 간 회사일수록 위로, 탈락은 맨 아래로.
+ * 상태가 같으면 마감순은 급한 것부터(마감일이 없는 회사는 뒤로), 최신순은 최근에 추가한 회사부터.
  */
 function sortCompanies(list: Company[], sort: CoverSort): Company[] {
-  const next = [...list];
-  if (sort === "created") return next.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  return next.sort((a, b) => {
+  return [...list].sort((a, b) => {
+    const byStatus = STATUS_RANK[a.status] - STATUS_RANK[b.status];
+    if (byStatus !== 0) return byStatus;
+    if (sort === "created") return b.createdAt.localeCompare(a.createdAt);
     if (!a.due && !b.due) return b.createdAt.localeCompare(a.createdAt);
     if (!a.due) return 1;
     if (!b.due) return -1;
     return a.due.localeCompare(b.due);
   });
 }
+
+/** 목록에서 위에 올 순서. 작은 값이 위다. */
+const STATUS_RANK: Record<CompanyStatus, number> = {
+  writing: 0,
+  draft: 1,
+  passed: 2,
+  interview: 3,
+  aptitude: 4,
+  assignment: 5,
+  coding_test: 6,
+  docs_passed: 7,
+  applied: 8,
+  rejected: 9,
+};
