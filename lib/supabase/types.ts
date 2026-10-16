@@ -331,6 +331,26 @@ export type Database = {
         };
         Relationships: [];
       };
+      profile_links: {
+        Row: {
+          user_id: string;
+          portfolio: string;
+          resume: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          portfolio?: string;
+          resume?: string;
+          updated_at?: string;
+        };
+        Update: {
+          portfolio?: string;
+          resume?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       interview_questions: {
         Row: {
           id: string;

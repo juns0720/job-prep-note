@@ -117,6 +117,12 @@ export type JobRules = {
   stacks: string[];
 };
 
+/** 지원서에 붙여 넣을 내 링크. DB의 profile_links와 짝이고 사용자마다 하나다. 비어 있으면 빈 문자열. */
+export type ProfileLinks = {
+  portfolio: string;
+  resume: string;
+};
+
 export type CompanyInfo = {
   source: string;
   company_id?: number;

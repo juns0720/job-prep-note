@@ -23,6 +23,7 @@ import * as jobActions from "./actions/job-postings";
 import * as jobRuleActions from "./actions/job-rules";
 import * as materialActions from "./actions/materials";
 import * as periodActions from "./actions/periods";
+import * as profileLinkActions from "./actions/profile-links";
 import * as projectActions from "./actions/projects";
 import * as topicActions from "./actions/topics";
 import { DEFAULT_CHAR_LIMIT, NARROW_WIDTH } from "./config";
@@ -30,7 +31,7 @@ import { toDateOrNull } from "./date";
 import { isStage, isSubmitted } from "./status";
 import { toTab, type Tab } from "./tab";
 import { bottomOrder, newId, topOrder } from "./text";
-import type { Company, CompanyEvent, CompanyStatus, EventKind, JobPosting, JobRules, MaterialGroup, Period, Project, Topic } from "./types";
+import type { Company, CompanyEvent, CompanyStatus, EventKind, JobPosting, JobRules, MaterialGroup, Period, ProfileLinks, Project, Topic } from "./types";
 
 /**
  * 각 액션은 화면을 먼저(낙관적으로) 바꾸고, 그 뒤에 Supabase 서버 액션(lib/actions/*)을 불러 같은 내용을 저장한다.
@@ -90,6 +91,7 @@ export type InitialData = {
   projects: Project[];
   jobs: JobPosting[];
   jobRules: JobRules | null;
+  profileLinks: ProfileLinks;
 };
 
 export type InitialView = {
@@ -228,6 +230,10 @@ type Store = {
   jobRules: JobRules | null;
   saveJobRules: (rules: JobRules) => void;
 
+  /** 지원서에 붙여 넣을 내 링크. 자기소개서 화면 위에 둔다 */
+  profileLinks: ProfileLinks;
+  saveProfileLinks: (links: ProfileLinks) => void;
+
   // 답변 접기
   closed: Record<string, boolean>;
   toggleAnswer: (questionId: string, open: boolean) => void;
@@ -321,6 +327,7 @@ export function StudyNoteProvider({
   const [jobSort, setJobSort] = useState<JobSort>("due");
   const [jobSource, setJobSource] = useState<JobSource>("all");
   const [jobRules, setJobRules] = useState<JobRules | null>(initial.jobRules);
+  const [profileLinks, setProfileLinks] = useState<ProfileLinks>(initial.profileLinks);
 
   const [closed, setClosed] = useState<Record<string, boolean>>({});
 
@@ -361,8 +368,8 @@ export function StudyNoteProvider({
   const newQRows = useRef(new Set<string>());
 
   // 새로 읽기(아래 effect)가 시작할 때의 화면 데이터. 비동기로 읽는 동안 바뀌었는지 비교한다.
-  const latest = useRef({ periodList, companies, topics, materialGroups, projects, jobs, jobRules, newQ });
-  latest.current = { periodList, companies, topics, materialGroups, projects, jobs, jobRules, newQ };
+  const latest = useRef({ periodList, companies, topics, materialGroups, projects, jobs, jobRules, profileLinks, newQ });
+  latest.current = { periodList, companies, topics, materialGroups, projects, jobs, jobRules, profileLinks, newQ };
 
   useEffect(() => {
     let hiddenAt = document.visibilityState === "hidden" ? Date.now() : 0;
@@ -400,8 +407,9 @@ export function StudyNoteProvider({
         setProjects((prev) => (prev === start.projects ? merged.projects : prev));
         setJobs((prev) => (prev === start.jobs ? merged.jobs : prev));
         setJobRules((prev) => (prev === start.jobRules ? merged.jobRules : prev));
+        setProfileLinks((prev) => (prev === start.profileLinks ? merged.profileLinks : prev));
         const now = latest.current;
-        const skipped = (["periodList", "companies", "topics", "materialGroups", "projects", "jobs", "jobRules"] as const).some(
+        const skipped = (["periodList", "companies", "topics", "materialGroups", "projects", "jobs", "jobRules", "profileLinks"] as const).some(
           (k) => now[k] !== start[k],
         );
         if (skipped) later(attempt);
@@ -1109,6 +1117,11 @@ export function StudyNoteProvider({
         setJobRules(rules);
         jobRuleActions.saveJobRules(rules).catch((e) => console.error("필터링 규칙 저장 실패", e));
       },
+      profileLinks,
+      saveProfileLinks: (links) => {
+        setProfileLinks(links);
+        profileLinkActions.saveProfileLinks(links).catch((e) => console.error("내 링크 저장 실패", e));
+      },
 
       closed,
       toggleAnswer: (qId, open) => setClosed((prev) => ({ ...prev, [qId]: open })),
@@ -1126,7 +1139,7 @@ export function StudyNoteProvider({
     editQ, newQ, qDraft, closed,
     materialGroups, groupId, editGroup, groupDraft,
     projects,
-    jobs, jobId, jobView, jobSort, jobSource, jobRules,
+    jobs, jobId, jobView, jobSort, jobSource, jobRules, profileLinks,
     mapCompany, mapTopic, mapJob, mapGroup, saveQueue,
   ]);
 

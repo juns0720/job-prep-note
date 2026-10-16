@@ -1,6 +1,7 @@
 "use client";
 
 import { CompanyRow } from "./CompanyRow";
+import { ProfileLinks } from "./ProfileLinks";
 import { BTN_ADD, BTN_CANCEL, BTN_SAVE, INPUT_PANEL, LABEL_MINI, LIST_CARD } from "../ui/classes";
 import { SortButton, ViewButton } from "../ui/ListToggle";
 import { isSubmitted } from "@/lib/status";
@@ -33,6 +34,8 @@ export function CoverAside() {
 
   return (
     <div>
+      <ProfileLinks />
+
       <div className="mb-7 flex items-center gap-8">
         <span className="text-12 font-semibold text-muted">지원 시기</span>
         <div className="ml-auto flex gap-10">

@@ -70,6 +70,8 @@ export function mergeFresh(fresh: InitialData, local: InitialData, pending: Set<
     jobs: pickLocal(fresh.jobs, local.jobs, (id) => keep("job", id)),
     // 누를 때마다 서버 액션으로 보내는 값이라 서버 것을 그대로 따른다.
     jobRules: fresh.jobRules,
+    // 저장을 누를 때 서버 액션으로 보내는 값이라 이것도 서버 것을 따른다.
+    profileLinks: fresh.profileLinks,
   };
 }
 

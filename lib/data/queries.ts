@@ -1,8 +1,8 @@
 import "server-only";
 import { currentPeriodLabel } from "@/lib/date";
 import { createClient } from "@/lib/supabase/server";
-import type { Company, JobPosting, JobRules, MaterialGroup, Project, Topic } from "@/lib/types";
-import { groupBy, mapCompanyRow, mapJobPostingRow, mapJobRulesRow, mapMaterialGroupRow, mapProjectRow, mapTopicRow } from "./mappers";
+import type { Company, JobPosting, JobRules, MaterialGroup, ProfileLinks, Project, Topic } from "@/lib/types";
+import { groupBy, mapCompanyRow, mapJobPostingRow, mapJobRulesRow, mapMaterialGroupRow, mapProfileLinksRow, mapProjectRow, mapTopicRow } from "./mappers";
 
 export type UserData = {
   periodList: string[];
@@ -13,6 +13,8 @@ export type UserData = {
   jobs: JobPosting[];
   /** 아직 저장한 적이 없으면 null */
   jobRules: JobRules | null;
+  /** 아직 저장한 적이 없으면 빈 링크 */
+  profileLinks: ProfileLinks;
 };
 
 /**
@@ -59,6 +61,7 @@ export async function loadUserData(userId: string): Promise<UserData> {
     { data: projectRows, error: projectError },
     { data: eventRows, error: eventError },
     { data: jobRulesRow, error: jobRulesError },
+    { data: profileLinksRow, error: profileLinksError },
   ] = await Promise.all([
     supabase.from("companies").select("*").eq("user_id", userId).order("due", { ascending: true, nullsFirst: false }),
     supabase.from("cover_questions").select("*").eq("user_id", userId),
@@ -76,6 +79,7 @@ export async function loadUserData(userId: string): Promise<UserData> {
     supabase.from("projects").select("*").eq("user_id", userId).order("sort_order", { ascending: true }),
     supabase.from("company_events").select("*").eq("user_id", userId),
     supabase.from("job_rules").select("*").eq("user_id", userId).maybeSingle(),
+    supabase.from("profile_links").select("*").eq("user_id", userId).maybeSingle(),
   ]);
 
   if (companyError) throw companyError;
@@ -93,6 +97,8 @@ export async function loadUserData(userId: string): Promise<UserData> {
   if (eventError) console.error("전형 일정을 읽지 못했다. supabase/schema.sql을 올렸는지 본다.", eventError);
   // 규칙이 없어도 공고는 보여야 한다.
   if (jobRulesError) console.error("필터링 규칙을 읽지 못했다. supabase/schema.sql을 올렸는지 본다.", jobRulesError);
+  // 내 링크가 없어도 자기소개서는 보여야 한다.
+  if (profileLinksError) console.error("내 링크를 읽지 못했다. supabase/schema.sql을 올렸는지 본다.", profileLinksError);
   const eventsByCompany = groupBy(eventError ? [] : (eventRows ?? []), (e) => e.company_id);
   const materialsByGroup = groupBy(materialRows ?? [], (m) => m.group_id);
 
@@ -109,5 +115,6 @@ export async function loadUserData(userId: string): Promise<UserData> {
     projects: projectError ? [] : (projectRows ?? []).map(mapProjectRow),
     jobs: jobError ? [] : (jobRows ?? []).map(mapJobPostingRow),
     jobRules: !jobRulesError && jobRulesRow ? mapJobRulesRow(jobRulesRow) : null,
+    profileLinks: !profileLinksError && profileLinksRow ? mapProfileLinksRow(profileLinksRow) : { portfolio: "", resume: "" },
   };
 }
