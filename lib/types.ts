@@ -185,3 +185,46 @@ export type JobQuestion = {
   limit: number | null;
   include_space: boolean | null;
 };
+
+/**
+ * 인적사항 섹션의 형식. DB의 profile_sections.kind와 짝이다(0018).
+ * fields  항목 · 값 · 비고 줄 (기본 인적사항, 주소, 병역 ...)
+ * list    같은 칸을 가진 여러 건 (학력, 자격증, 수상 ...)
+ * text    긴 글 하나 (경력기술서, 지원처별 입력 기록)
+ */
+export type ProfileKind = "fields" | "list" | "text";
+
+/** list 섹션의 칸. wide면 한 줄을 다 쓰고 글자 수를 보여 준다(활동 내역, 상세 내용 같은 긴 글). */
+export type ProfileColumn = { id: string; name: string; wide: boolean };
+
+/** fields 섹션의 한 줄. 값이 빈 문자열이면 미기록이다. */
+export type ProfileField = { id: string; label: string; value: string; note: string };
+
+/** list 섹션의 한 건. 칸 id → 값. 없는 칸은 미기록이다. */
+export type ProfileEntry = { id: string; cells: Record<string, string> };
+
+export type ProfileSection = {
+  id: string;
+  name: string;
+  kind: ProfileKind;
+  columns: ProfileColumn[];
+  /** 값을 양식에 맞추는 규칙 */
+  note: string;
+  /** text 섹션의 본문 */
+  body: string;
+  fields: ProfileField[];
+  entries: ProfileEntry[];
+};
+
+/** 첨부 파일. 파일은 Storage의 profile-files 버킷 path에 있다. photo는 증명사진. */
+export type ProfileFile = {
+  id: string;
+  kind: "photo" | "document";
+  label: string;
+  path: string;
+  fileName: string;
+  mime: string;
+  size: number;
+  /** 올리는 중이라 아직 DB에 없다. 화면에만 있다 */
+  uploading?: boolean;
+};

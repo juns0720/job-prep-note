@@ -40,7 +40,11 @@ export type SaveKind =
   | "material"
   | "materialOrder"
   | "project"
-  | "job";
+  | "job"
+  | "profileSection"
+  | "profileField"
+  | "profileEntry"
+  | "profileFile";
 export const SAVE_KINDS: SaveKind[] = [
   "company",
   "coverQuestion",
@@ -52,6 +56,10 @@ export const SAVE_KINDS: SaveKind[] = [
   "materialOrder",
   "project",
   "job",
+  "profileSection",
+  "profileField",
+  "profileEntry",
+  "profileFile",
 ];
 
 /** 화면에서 새로 만드는 행. row의 칸 이름은 DB 칸 그대로다(서버가 kind마다 허용한 칸만 넣는다). */
@@ -65,6 +73,10 @@ export const CREATE_KINDS: CreateKind[] = [
   "materialGroup",
   "material",
   "project",
+  "profileSection",
+  "profileField",
+  "profileEntry",
+  "profileFile",
 ];
 
 export type SaveItem = { kind: SaveKind; id: string; seq: number; patch: Record<string, unknown> };

@@ -331,6 +331,118 @@ export type Database = {
         };
         Relationships: [];
       };
+      profile_sections: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          kind: string;
+          columns: unknown;
+          note: string;
+          body: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name?: string;
+          kind?: string;
+          columns?: unknown;
+          note?: string;
+          body?: string;
+          sort_order?: number;
+        };
+        Update: {
+          name?: string;
+          kind?: string;
+          columns?: unknown;
+          note?: string;
+          body?: string;
+          sort_order?: number;
+        };
+        Relationships: [];
+      };
+      profile_fields: {
+        Row: {
+          id: string;
+          user_id: string;
+          section_id: string;
+          label: string;
+          value: string;
+          note: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          section_id: string;
+          label?: string;
+          value?: string;
+          note?: string;
+          sort_order?: number;
+        };
+        Update: {
+          label?: string;
+          value?: string;
+          note?: string;
+          sort_order?: number;
+        };
+        Relationships: [];
+      };
+      profile_entries: {
+        Row: {
+          id: string;
+          user_id: string;
+          section_id: string;
+          cells: unknown;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          section_id: string;
+          cells?: unknown;
+          sort_order?: number;
+        };
+        Update: {
+          cells?: unknown;
+          sort_order?: number;
+        };
+        Relationships: [];
+      };
+      profile_files: {
+        Row: {
+          id: string;
+          user_id: string;
+          kind: string;
+          label: string;
+          path: string;
+          file_name: string;
+          mime: string;
+          size: number;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          kind?: string;
+          label?: string;
+          path: string;
+          file_name?: string;
+          mime?: string;
+          size?: number;
+          sort_order?: number;
+        };
+        Update: {
+          label?: string;
+          sort_order?: number;
+        };
+        Relationships: [];
+      };
       profile_links: {
         Row: {
           user_id: string;

@@ -23,6 +23,7 @@ import * as jobActions from "./actions/job-postings";
 import * as jobRuleActions from "./actions/job-rules";
 import * as materialActions from "./actions/materials";
 import * as periodActions from "./actions/periods";
+import * as profileActions from "./actions/profile";
 import * as profileLinkActions from "./actions/profile-links";
 import * as projectActions from "./actions/projects";
 import * as topicActions from "./actions/topics";
@@ -30,8 +31,26 @@ import { DEFAULT_CHAR_LIMIT, NARROW_WIDTH } from "./config";
 import { toDateOrNull } from "./date";
 import { isStage, isSubmitted } from "./status";
 import { toTab, type Tab } from "./tab";
+import { uploadProfileBlob } from "./profile-upload";
 import { bottomOrder, newId, topOrder } from "./text";
-import type { Company, CompanyEvent, CompanyStatus, EventKind, JobPosting, JobRules, MaterialGroup, Period, ProfileLinks, Project, Topic } from "./types";
+import type {
+  Company,
+  CompanyEvent,
+  CompanyStatus,
+  EventKind,
+  JobPosting,
+  JobRules,
+  MaterialGroup,
+  Period,
+  ProfileColumn,
+  ProfileField,
+  ProfileFile,
+  ProfileKind,
+  ProfileLinks,
+  ProfileSection,
+  Project,
+  Topic,
+} from "./types";
 
 /**
  * 각 액션은 화면을 먼저(낙관적으로) 바꾸고, 그 뒤에 Supabase 서버 액션(lib/actions/*)을 불러 같은 내용을 저장한다.
@@ -71,6 +90,8 @@ export type CoverView = "writing" | "applied";
 export type CoverSort = "due" | "created";
 /** 재료 탭에서 컨셉 대신 고를 수 있는 "최종" 모아 보기. groupId에 이 값을 넣는다. */
 export const FINAL_GROUP = "final";
+/** 인적사항 탭에서 섹션 대신 고를 수 있는 "첨부 파일·링크". sectionId에 이 값을 넣는다. */
+export const PROFILE_FILES = "files";
 
 /** 이만큼 가려져 있다가 다시 보이면 데이터를 새로 읽는다. 잠깐 다른 창을 보고 오는 것까지 매번 읽지는 않는다. */
 const REFRESH_AFTER_HIDDEN_MS = 30_000;
@@ -92,6 +113,8 @@ export type InitialData = {
   jobs: JobPosting[];
   jobRules: JobRules | null;
   profileLinks: ProfileLinks;
+  profileSections: ProfileSection[];
+  profileFiles: ProfileFile[];
 };
 
 export type InitialView = {
@@ -101,6 +124,7 @@ export type InitialView = {
   topic?: string;
   group?: string;
   job?: string;
+  section?: string;
 };
 
 type Store = {
@@ -114,6 +138,7 @@ type Store = {
   goInterview: () => void;
   goJobs: () => void;
   goCalendar: () => void;
+  goProfile: () => void;
   backToSide: () => void;
   signOut: () => void;
 
@@ -234,6 +259,25 @@ type Store = {
   profileLinks: ProfileLinks;
   saveProfileLinks: (links: ProfileLinks) => void;
 
+  // 인적사항 — 섹션(기본 인적사항, 학력 ...) 아래에 항목을 둔다. 쓰는 대로 저장한다
+  profileSections: ProfileSection[];
+  /** 고른 섹션 id. PROFILE_FILES면 첨부 파일·링크 */
+  sectionId: string;
+  selectSection: (id: string) => void;
+  addSection: () => void;
+  removeSection: (sec: ProfileSection) => void;
+  setSection: (id: string, patch: { name?: string; kind?: ProfileKind; columns?: ProfileColumn[]; note?: string; body?: string }) => void;
+  addProfileField: (sectionId: string) => void;
+  setProfileField: (sectionId: string, id: string, patch: Partial<Omit<ProfileField, "id">>) => void;
+  removeProfileField: (sectionId: string, field: ProfileField) => void;
+  addProfileEntry: (sectionId: string) => void;
+  setProfileCell: (sectionId: string, entryId: string, columnId: string, value: string) => void;
+  removeProfileEntry: (sectionId: string, entryId: string) => void;
+  profileFiles: ProfileFile[];
+  uploadProfileFile: (file: File, kind: ProfileFile["kind"]) => Promise<void>;
+  setProfileFileLabel: (id: string, label: string) => void;
+  removeProfileFile: (f: ProfileFile) => void;
+
   // 답변 접기
   closed: Record<string, boolean>;
   toggleAnswer: (questionId: string, open: boolean) => void;
@@ -282,6 +326,11 @@ export function StudyNoteProvider({
         initialView?.group === FINAL_GROUP ||
         (!!initialView?.group && initial.materialGroups.some((g) => g.id === initialView.group))
       );
+    if (tab === "profile")
+      return (
+        initialView?.section === PROFILE_FILES ||
+        (!!initialView?.section && initial.profileSections.some((sec) => sec.id === initialView.section))
+      );
     return !!initialView?.job;
   });
 
@@ -328,6 +377,13 @@ export function StudyNoteProvider({
   const [jobSource, setJobSource] = useState<JobSource>("all");
   const [jobRules, setJobRules] = useState<JobRules | null>(initial.jobRules);
   const [profileLinks, setProfileLinks] = useState<ProfileLinks>(initial.profileLinks);
+  const [profileSections, setProfileSections] = useState<ProfileSection[]>(initial.profileSections);
+  const [profileFiles, setProfileFiles] = useState<ProfileFile[]>(initial.profileFiles);
+  const [sectionId, setSectionId] = useState(() => {
+    if (initialView?.section === PROFILE_FILES) return PROFILE_FILES;
+    if (initialView?.section && initial.profileSections.some((sec) => sec.id === initialView.section)) return initialView.section;
+    return initial.profileSections[0]?.id ?? PROFILE_FILES;
+  });
 
   const [closed, setClosed] = useState<Record<string, boolean>>({});
 
@@ -349,10 +405,11 @@ export function StudyNoteProvider({
     if (tab === "interview" && topicId) params.set("topic", topicId);
     if (tab === "material" && groupId) params.set("group", groupId);
     if (tab === "job" && jobId) params.set("job", jobId);
+    if (tab === "profile" && sectionId) params.set("section", sectionId);
     const qs = params.toString();
     const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.replaceState(null, "", url);
-  }, [tab, period, coverId, topicId, groupId, jobId]);
+  }, [tab, period, coverId, topicId, groupId, jobId, sectionId]);
 
   // 타이핑 중인 필드를 바로 보내는 저장 큐. 렌더마다 새로 만들지 않도록 ref에 한 번만 둔다.
   const saveQueueRef = useRef<ReturnType<typeof createSaveQueue> | null>(null);
@@ -368,8 +425,8 @@ export function StudyNoteProvider({
   const newQRows = useRef(new Set<string>());
 
   // 새로 읽기(아래 effect)가 시작할 때의 화면 데이터. 비동기로 읽는 동안 바뀌었는지 비교한다.
-  const latest = useRef({ periodList, companies, topics, materialGroups, projects, jobs, jobRules, profileLinks, newQ });
-  latest.current = { periodList, companies, topics, materialGroups, projects, jobs, jobRules, profileLinks, newQ };
+  const latest = useRef({ periodList, companies, topics, materialGroups, projects, jobs, jobRules, profileLinks, profileSections, profileFiles, newQ });
+  latest.current = { periodList, companies, topics, materialGroups, projects, jobs, jobRules, profileLinks, profileSections, profileFiles, newQ };
 
   useEffect(() => {
     let hiddenAt = document.visibilityState === "hidden" ? Date.now() : 0;
@@ -408,8 +465,23 @@ export function StudyNoteProvider({
         setJobs((prev) => (prev === start.jobs ? merged.jobs : prev));
         setJobRules((prev) => (prev === start.jobRules ? merged.jobRules : prev));
         setProfileLinks((prev) => (prev === start.profileLinks ? merged.profileLinks : prev));
+        setProfileSections((prev) => (prev === start.profileSections ? merged.profileSections : prev));
+        setProfileFiles((prev) => (prev === start.profileFiles ? merged.profileFiles : prev));
         const now = latest.current;
-        const skipped = (["periodList", "companies", "topics", "materialGroups", "projects", "jobs", "jobRules", "profileLinks"] as const).some(
+        const skipped = (
+          [
+            "periodList",
+            "companies",
+            "topics",
+            "materialGroups",
+            "projects",
+            "jobs",
+            "jobRules",
+            "profileLinks",
+            "profileSections",
+            "profileFiles",
+          ] as const
+        ).some(
           (k) => now[k] !== start[k],
         );
         if (skipped) later(attempt);
@@ -524,6 +596,12 @@ export function StudyNoteProvider({
     [],
   );
 
+  const mapSection = useCallback(
+    (id: string, fn: (sec: ProfileSection) => ProfileSection) =>
+      setProfileSections((prev) => prev.map((sec) => (sec.id === id ? fn(sec) : sec))),
+    [],
+  );
+
   const mapTopic = useCallback(
     (id: string, fn: (t: Topic) => Topic) =>
       setTopics((prev) => prev.map((t) => (t.id === id ? fn(t) : t))),
@@ -593,6 +671,10 @@ export function StudyNoteProvider({
       },
       goJobs: () => {
         setTab("job");
+        setDetail(false);
+      },
+      goProfile: () => {
+        setTab("profile");
         setDetail(false);
       },
       goCalendar: () => {
@@ -1123,6 +1205,112 @@ export function StudyNoteProvider({
         profileLinkActions.saveProfileLinks(links).catch((e) => console.error("내 링크 저장 실패", e));
       },
 
+      profileSections,
+      sectionId,
+      selectSection: (id) => {
+        setSectionId(id);
+        setDetail(true);
+      },
+      addSection: () => {
+        // 맨 아래에 항목형 섹션을 만들고 바로 연다. 이름과 형식은 상세에서 고친다.
+        const id = newId();
+        setProfileSections((prev) => [
+          ...prev,
+          { id, name: "새 섹션", kind: "fields", columns: [], note: "", body: "", fields: [], entries: [] },
+        ]);
+        saveQueue.create("profileSection", id, { name: "새 섹션", kind: "fields", columns: [], sort_order: bottomOrder() });
+        setSectionId(id);
+        setDetail(true);
+      },
+      removeSection: (sec) => {
+        const count = sec.kind === "fields" ? sec.fields.length : sec.kind === "list" ? sec.entries.length : 0;
+        if (!window.confirm(count > 0 ? `${sec.name} 섹션과 그 안의 ${count}개를 지울까?` : `${sec.name} 섹션을 지울까?`)) return;
+        const left = profileSections.filter((x) => x.id !== sec.id);
+        setProfileSections(left);
+        if (sectionId === sec.id) setSectionId(left[0]?.id ?? PROFILE_FILES);
+        saveQueue
+          .afterCreate(sec.id, () => profileActions.removeProfileSection(sec.id))
+          .catch((e) => console.error("섹션 삭제 실패", e));
+      },
+      setSection: (id, patch) => {
+        mapSection(id, (sec) => ({ ...sec, ...patch }));
+        saveQueue.save("profileSection", id, patch);
+      },
+      addProfileField: (secId) => {
+        const id = newId();
+        mapSection(secId, (sec) => ({ ...sec, fields: [...sec.fields, { id, label: "", value: "", note: "" }] }));
+        saveQueue.create("profileField", id, { section_id: secId, label: "", sort_order: bottomOrder() });
+      },
+      setProfileField: (secId, id, patch) => {
+        mapSection(secId, (sec) => ({ ...sec, fields: sec.fields.map((f) => (f.id === id ? { ...f, ...patch } : f)) }));
+        saveQueue.save("profileField", id, patch);
+      },
+      removeProfileField: (secId, field) => {
+        if (!window.confirm(`${field.label || "이름 없는"} 항목을 지울까?`)) return;
+        mapSection(secId, (sec) => ({ ...sec, fields: sec.fields.filter((f) => f.id !== field.id) }));
+        saveQueue
+          .afterCreate(field.id, () => profileActions.removeProfileField(field.id))
+          .catch((e) => console.error("항목 삭제 실패", e));
+      },
+      addProfileEntry: (secId) => {
+        const id = newId();
+        mapSection(secId, (sec) => ({ ...sec, entries: [...sec.entries, { id, cells: {} }] }));
+        saveQueue.create("profileEntry", id, { section_id: secId, sort_order: bottomOrder() });
+      },
+      setProfileCell: (secId, entryId, columnId, value) => {
+        // 건의 값은 jsonb 하나라 통째로 보낸다. 지금 화면의 값에서 이 칸만 바꾼다.
+        const entry = profileSections.find((sec) => sec.id === secId)?.entries.find((e) => e.id === entryId);
+        if (!entry) return;
+        const cells = { ...entry.cells, [columnId]: value };
+        mapSection(secId, (sec) => ({ ...sec, entries: sec.entries.map((e) => (e.id === entryId ? { ...e, cells } : e)) }));
+        saveQueue.save("profileEntry", entryId, { cells });
+      },
+      removeProfileEntry: (secId, entryId) => {
+        if (!window.confirm("이 건을 지울까?")) return;
+        mapSection(secId, (sec) => ({ ...sec, entries: sec.entries.filter((e) => e.id !== entryId) }));
+        saveQueue
+          .afterCreate(entryId, () => profileActions.removeProfileEntry(entryId))
+          .catch((e) => console.error("건 삭제 실패", e));
+      },
+      profileFiles,
+      uploadProfileFile: async (file, kind) => {
+        // 올리는 동안에도 목록에 보이게 먼저 넣는다. 행은 Storage에 다 올라간 뒤에 만든다 —
+        // 먼저 만들면 올리기가 실패했을 때 파일 없는 행이 남는다.
+        const id = newId();
+        const label = kind === "photo" ? "증명사진" : file.name.replace(/\.[^.]+$/, "");
+        const mime = file.type || "application/octet-stream";
+        setProfileFiles((prev) => [
+          ...prev,
+          { id, kind, label, path: "", fileName: file.name, mime, size: file.size, uploading: true },
+        ]);
+        try {
+          const path = await uploadProfileBlob(id, file);
+          setProfileFiles((prev) => prev.map((f) => (f.id === id ? { ...f, path, uploading: false } : f)));
+          saveQueue.create("profileFile", id, {
+            kind,
+            label,
+            path,
+            file_name: file.name,
+            mime,
+            size: file.size,
+            sort_order: bottomOrder(),
+          });
+        } catch (e) {
+          console.error("파일 올리기 실패", e);
+          setProfileFiles((prev) => prev.filter((f) => f.id !== id));
+          window.alert(`${file.name}을 올리지 못했다. 인터넷 연결과 파일 크기(20MB까지)를 확인하고 다시 올려 줘.`);
+        }
+      },
+      setProfileFileLabel: (id, label) => {
+        setProfileFiles((prev) => prev.map((f) => (f.id === id ? { ...f, label } : f)));
+        saveQueue.save("profileFile", id, { label });
+      },
+      removeProfileFile: (f) => {
+        if (!window.confirm(`${f.label || f.fileName} 파일을 지울까?`)) return;
+        setProfileFiles((prev) => prev.filter((x) => x.id !== f.id));
+        saveQueue.afterCreate(f.id, () => profileActions.removeProfileFile(f.id)).catch((e) => console.error("파일 삭제 실패", e));
+      },
+
       closed,
       toggleAnswer: (qId, open) => setClosed((prev) => ({ ...prev, [qId]: open })),
       toggleAll: (questions, anyOpen) => {
@@ -1140,7 +1328,8 @@ export function StudyNoteProvider({
     materialGroups, groupId, editGroup, groupDraft,
     projects,
     jobs, jobId, jobView, jobSort, jobSource, jobRules, profileLinks,
-    mapCompany, mapTopic, mapJob, mapGroup, saveQueue,
+    profileSections, profileFiles, sectionId,
+    mapCompany, mapTopic, mapJob, mapGroup, mapSection, saveQueue,
   ]);
 
   return <StudyNoteContext.Provider value={value}>{children}</StudyNoteContext.Provider>;

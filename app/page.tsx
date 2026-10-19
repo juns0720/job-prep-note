@@ -44,6 +44,7 @@ export default async function Page({ searchParams }: { searchParams: SearchParam
     topic: typeof params.topic === "string" ? params.topic : undefined,
     group: typeof params.group === "string" ? params.group : undefined,
     job: typeof params.job === "string" ? params.job : undefined,
+    section: typeof params.section === "string" ? params.section : undefined,
   };
 
   return (

@@ -1,5 +1,21 @@
 import type { Database } from "@/lib/supabase/types";
-import type { Company, CompanyEvent, CompanyInfo, JobPosting, JobProcess, JobQuestion, JobRules, MaterialGroup, ProfileLinks, Project, Topic } from "@/lib/types";
+import type {
+  Company,
+  CompanyEvent,
+  CompanyInfo,
+  JobPosting,
+  JobProcess,
+  JobQuestion,
+  JobRules,
+  MaterialGroup,
+  ProfileColumn,
+  ProfileFile,
+  ProfileKind,
+  ProfileLinks,
+  ProfileSection,
+  Project,
+  Topic,
+} from "@/lib/types";
 
 type CompanyRow = Database["public"]["Tables"]["companies"]["Row"];
 type CoverQuestionRow = Database["public"]["Tables"]["cover_questions"]["Row"];
@@ -12,6 +28,10 @@ type MaterialGroupRow = Database["public"]["Tables"]["material_groups"]["Row"];
 type MaterialRow = Database["public"]["Tables"]["materials"]["Row"];
 type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
 type CompanyEventRow = Database["public"]["Tables"]["company_events"]["Row"];
+type ProfileSectionRow = Database["public"]["Tables"]["profile_sections"]["Row"];
+type ProfileFieldRow = Database["public"]["Tables"]["profile_fields"]["Row"];
+type ProfileEntryRow = Database["public"]["Tables"]["profile_entries"]["Row"];
+type ProfileFileRow = Database["public"]["Tables"]["profile_files"]["Row"];
 
 export function mapProjectRow(row: ProjectRow): Project {
   return { id: row.id, name: row.name, description: row.description, keywords: row.keywords };
@@ -110,4 +130,48 @@ export function groupBy<T>(rows: T[], keyOf: (row: T) => string): Map<string, T[
     else map.set(key, [row]);
   }
   return map;
+}
+
+const PROFILE_KINDS: ProfileKind[] = ["fields", "list", "text"];
+
+/** jsonb라 모양을 믿지 않고 한 번 거른다. 손으로 고친 행이 섞여도 화면이 죽지 않게. */
+function toColumns(v: unknown): ProfileColumn[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((c): c is Record<string, unknown> => !!c && typeof c === "object" && typeof c.id === "string")
+    .map((c) => ({ id: c.id as string, name: typeof c.name === "string" ? c.name : "", wide: c.wide === true }));
+}
+
+function toCells(v: unknown): Record<string, string> {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+  const out: Record<string, string> = {};
+  for (const [k, val] of Object.entries(v)) if (typeof val === "string") out[k] = val;
+  return out;
+}
+
+export function mapProfileSectionRow(row: ProfileSectionRow, fields: ProfileFieldRow[], entries: ProfileEntryRow[]): ProfileSection {
+  return {
+    id: row.id,
+    name: row.name,
+    kind: PROFILE_KINDS.includes(row.kind as ProfileKind) ? (row.kind as ProfileKind) : "fields",
+    columns: toColumns(row.columns),
+    note: row.note ?? "",
+    body: row.body ?? "",
+    fields: [...fields]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((f) => ({ id: f.id, label: f.label, value: f.value, note: f.note })),
+    entries: [...entries].sort((a, b) => a.sort_order - b.sort_order).map((e) => ({ id: e.id, cells: toCells(e.cells) })),
+  };
+}
+
+export function mapProfileFileRow(row: ProfileFileRow): ProfileFile {
+  return {
+    id: row.id,
+    kind: row.kind === "photo" ? "photo" : "document",
+    label: row.label,
+    path: row.path,
+    fileName: row.file_name,
+    mime: row.mime,
+    size: Number(row.size),
+  };
 }

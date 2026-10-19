@@ -10,6 +10,8 @@ import { JobAside } from "./job/JobAside";
 import { JobDetail } from "./job/JobDetail";
 import { MaterialAside } from "./material/MaterialAside";
 import { MaterialDetail } from "./material/MaterialDetail";
+import { ProfileAside } from "./profile/ProfileAside";
+import { ProfileDetail } from "./profile/ProfileDetail";
 import { ProjectList } from "./project/ProjectList";
 import { BTN_CANCEL, BTN_SAVE } from "./ui/classes";
 import { useStudyNote } from "@/lib/store";
@@ -31,6 +33,7 @@ export function AppShell({ userEmail }: { userEmail: string }) {
           {/* 좁은 화면에서는 탭이 한 줄에 다 안 들어간다. 글자가 꺾이지 않게 탭째로 다음 줄로 넘긴다. */}
           <nav className="ml-auto flex flex-wrap gap-2 pb-2">
             <Tab label="자기소개서" active={s.tab === "cover"} onClick={s.goCover} />
+            <Tab label="인적사항" active={s.tab === "profile"} onClick={s.goProfile} />
             <Tab label="재료" active={s.tab === "material"} onClick={s.goMaterial} />
             <Tab label="프로젝트" active={s.tab === "project"} onClick={s.goProject} />
             <Tab label="면접 준비" active={s.tab === "interview"} onClick={s.goInterview} />
@@ -73,6 +76,8 @@ export function AppShell({ userEmail }: { userEmail: string }) {
                   <MaterialAside />
                 ) : s.tab === "interview" ? (
                   <InterviewAside />
+                ) : s.tab === "profile" ? (
+                  <ProfileAside />
                 ) : (
                   <JobAside />
                 )}
@@ -93,6 +98,8 @@ export function AppShell({ userEmail }: { userEmail: string }) {
                   <MaterialDetail />
                 ) : s.tab === "interview" ? (
                   <InterviewDetail />
+                ) : s.tab === "profile" ? (
+                  <ProfileDetail />
                 ) : (
                   <JobDetail />
                 )}

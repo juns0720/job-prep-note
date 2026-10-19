@@ -25,6 +25,14 @@ const ROW_KINDS: Record<Exclude<SaveKind, "materialOrder">, { table: string; fie
   material: { table: "materials", fields: { title: "title", t: "body", final: "final" } },
   project: { table: "projects", fields: { name: "name", description: "description", keywords: "keywords" } },
   job: { table: "job_postings", fields: { note: "note" } },
+  // 칸 목록(columns)과 건의 값(cells)은 jsonb라 통째로 보낸다.
+  profileSection: {
+    table: "profile_sections",
+    fields: { name: "name", kind: "kind", columns: "columns", note: "note", body: "body" },
+  },
+  profileField: { table: "profile_fields", fields: { label: "label", value: "value", note: "note" } },
+  profileEntry: { table: "profile_entries", fields: { cells: "cells" } },
+  profileFile: { table: "profile_files", fields: { label: "label" } },
 };
 
 /**
@@ -129,6 +137,11 @@ const CREATE_KINDS: Record<CreateKind, { table: string; columns: string[] }> = {
   materialGroup: { table: "material_groups", columns: ["name", "sort_order"] },
   material: { table: "materials", columns: ["group_id", "sort_order"] },
   project: { table: "projects", columns: ["name", "sort_order"] },
+  profileSection: { table: "profile_sections", columns: ["name", "kind", "columns", "sort_order"] },
+  profileField: { table: "profile_fields", columns: ["section_id", "label", "sort_order"] },
+  profileEntry: { table: "profile_entries", columns: ["section_id", "sort_order"] },
+  // 파일은 Storage에 다 올린 뒤에 만든다(lib/store.tsx의 uploadProfileFile).
+  profileFile: { table: "profile_files", columns: ["kind", "label", "path", "file_name", "mime", "size", "sort_order"] },
 };
 
 /** Postgres foreign_key_violation. 부모 행(회사·주제·컨셉)이 이미 지워졌다. */

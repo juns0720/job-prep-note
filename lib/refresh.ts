@@ -72,7 +72,30 @@ export function mergeFresh(fresh: InitialData, local: InitialData, pending: Set<
     jobRules: fresh.jobRules,
     // 저장을 누를 때 서버 액션으로 보내는 값이라 이것도 서버 것을 따른다.
     profileLinks: fresh.profileLinks,
+    profileSections: mergeProfileSections(fresh.profileSections, local.profileSections, keep),
+    // 올리는 중인 파일은 아직 DB에 없다. 화면에 그대로 둔다.
+    profileFiles: [
+      ...pickLocal(fresh.profileFiles, local.profileFiles, (id) => keep("profileFile", id)),
+      ...local.profileFiles.filter((f) => f.uploading),
+    ],
   };
+}
+
+function mergeProfileSections(
+  fresh: InitialData["profileSections"],
+  local: InitialData["profileSections"],
+  keep: (kind: string, id: string) => boolean,
+): InitialData["profileSections"] {
+  const localById = byId(local);
+  return fresh.map((sec) => {
+    const l = localById.get(sec.id);
+    const head = l && keep("profileSection", sec.id) ? l : sec;
+    return {
+      ...head,
+      fields: pickLocal(sec.fields, l?.fields ?? [], (id) => keep("profileField", id)),
+      entries: pickLocal(sec.entries, l?.entries ?? [], (id) => keep("profileEntry", id)),
+    };
+  });
 }
 
 function byId<T extends { id: string }>(list: T[]): Map<string, T> {
