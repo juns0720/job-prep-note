@@ -337,7 +337,7 @@ create policy "profile_links는 본인 것만" on profile_links
 -- ---------------------------------------------------------------------------
 -- 인적사항
 -- 채용 사이트 지원서에 넣는 인적사항을 모아 둔다. AI가 지원서 양식을 채울 때 여기서
--- 값을 읽는다(scripts/export-profile.mjs, docs/profile-autofill.md).
+-- 값을 읽는다(scripts/export-profile.mjs, docs/ai/profile-autofill.md).
 --
 -- 양식마다 칸이 달라서 칸을 테이블 컬럼으로 고정하지 않는다. 섹션(기본 인적사항, 학력 ...)
 -- 아래에 항목을 행으로 둬서, 양식에서 처음 보는 칸이 나오면 스키마를 바꾸지 않고 행만 더한다.
