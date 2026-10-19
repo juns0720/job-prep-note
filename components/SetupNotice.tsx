@@ -57,7 +57,7 @@ function DataError({ error }: { error: string }) {
       <p className="m-0 mb-18 text-13 leading-memo text-muted">
         로그인은 됐는데 테이블을 읽는 데서 막혔다. 스키마를 아직 안 올렸다면
         Supabase SQL Editor에서 supabase/schema.sql을 한 번 실행한다.
-        Table Editor에 테이블 열한 개가 보이면 준비된 것이다.
+        Table Editor에 테이블 열여섯 개가 보이면 준비된 것이다.
       </p>
 
       <div className="rounded-input border border-line bg-surface p-14">

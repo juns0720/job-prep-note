@@ -36,9 +36,9 @@ const ROW_KINDS: Record<Exclude<SaveKind, "materialOrder">, { table: string; fie
 };
 
 /**
- * 순서 칸(save_tab·save_seq, order_tab·order_seq)을 만드는 마이그레이션(0011·0016)을 DB에 안
- * 올렸는지. 실제로 0011이 빠진 채 배포돼, 모든 저장이 이 오류로 실패하고 탭을 닫으면 쓴 것이
- * 사라졌다. 이때는 순서 확인 없이 값만이라도 저장한다.
+ * 순서 칸(save_tab·save_seq, order_tab·order_seq)이 DB에 없는지. 예전 schema.sql로 만든 DB에
+ * 업데이트 SQL(supabase/updates/)을 안 올리면 이렇다. 그대로 두면 모든 저장이 이 오류로 실패하고
+ * 탭을 닫으면 쓴 것이 사라지므로, 이때는 순서 확인 없이 값만이라도 저장한다.
  *
  * 바꿀 값에 없는 칸이 있으면 PostgREST가 PGRST204로, 조건(or)에만 있으면 Postgres가
  * 42703(undefined_column)으로 막는다.
@@ -77,7 +77,7 @@ export async function saveItem(
       );
     let results = await reorder(true);
     if (results.some((r) => missingColumn(r.error))) {
-      console.error("순서 칸(order_tab·order_seq)이 DB에 없다. 마이그레이션 0011을 올려야 한다.");
+      console.error("순서 칸(order_tab·order_seq)이 DB에 없다. supabase/updates/의 SQL을 올려야 한다.");
       results = await reorder(false);
     }
     const failed = results.find((r) => r.error);
@@ -104,7 +104,7 @@ export async function saveItem(
   };
   let { data, error } = await update(true);
   if (missingColumn(error)) {
-    console.error(`순서 칸(save_tab·save_seq)이 ${kind.table}에 없다. 마이그레이션 0011·0016을 올려야 한다.`);
+    console.error(`순서 칸(save_tab·save_seq)이 ${kind.table}에 없다. supabase/updates/의 SQL을 올려야 한다.`);
     ({ data, error } = await update(false));
   }
   if (error) {

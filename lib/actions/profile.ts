@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "./util";
 
-/** 첨부 파일 버킷. supabase/migrations/0018_profile.sql */
+/** 첨부 파일 버킷. supabase/schema.sql */
 const BUCKET = "profile-files";
 
 /** 섹션을 지운다. 그 아래 항목·건은 on delete cascade로 같이 지워진다. */

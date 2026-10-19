@@ -187,7 +187,7 @@ export type JobQuestion = {
 };
 
 /**
- * 인적사항 섹션의 형식. DB의 profile_sections.kind와 짝이다(0018).
+ * 인적사항 섹션의 형식. DB의 profile_sections.kind와 짝이다.
  * fields  항목 · 값 · 비고 줄 (기본 인적사항, 주소, 병역 ...)
  * list    같은 칸을 가진 여러 건 (학력, 자격증, 수상 ...)
  * text    긴 글 하나 (경력기술서, 지원처별 입력 기록)

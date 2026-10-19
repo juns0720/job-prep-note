@@ -52,7 +52,7 @@ async function main() {
   try {
     // head 요청은 테이블이 없어도 오류 없이 count만 비어서 온다. 한 줄을 읽어 본다.
     const { data: existing, error } = await supabase.from("profile_sections").select("id").limit(1);
-    if (error) throw new Error(`인적사항을 읽지 못했다. 0018 마이그레이션을 올렸는지 본다: ${error.message}`);
+    if (error) throw new Error(`인적사항을 읽지 못했다. supabase/schema.sql을 올렸는지 본다: ${error.message}`);
     if (existing.length > 0) throw new Error("이미 섹션이 있다. 빠진 칸만 더할 때는 add-profile-fields.mjs 를 쓴다.");
 
     const sections = [];

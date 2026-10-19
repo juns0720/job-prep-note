@@ -26,7 +26,7 @@ export type UserData = {
   jobRules: JobRules | null;
   /** 아직 저장한 적이 없으면 빈 링크 */
   profileLinks: ProfileLinks;
-  /** 인적사항. 0018 마이그레이션 전이면 빈 목록 */
+  /** 인적사항. 테이블이 없으면 빈 목록 */
   profileSections: ProfileSection[];
   profileFiles: ProfileFile[];
 };
@@ -34,8 +34,7 @@ export type UserData = {
 /**
  * 로그인 사용자의 데이터 전부를 한 번에 읽는다. 아직 시기가 하나도 없으면
  * (첫 로그인) 상/하반기로 계산한 기본 시기 하나를 만들어 둔다 — 회사나 질문은
- * 넣지 않는다. 번들의 자리 채움 데이터(lib/seed.ts)를 실제 계정에 섞으면
- * 진짜 지원 기록과 헷갈리기 때문이다.
+ * 넣지 않는다. 예시 데이터를 실제 계정에 섞으면 진짜 지원 기록과 헷갈리기 때문이다.
  *
  * PostgREST의 중첩 select 대신 테이블마다 따로 조회해서 자바스크립트에서 묶는다.
  * (lib/supabase/types.ts 상단 주석 참고 — 타입을 단순하게 유지하려는 선택이다.)
@@ -109,7 +108,7 @@ export async function loadUserData(userId: string): Promise<UserData> {
   if (coverQuestionError) throw coverQuestionError;
   if (topicError) throw topicError;
   if (interviewQuestionError) throw interviewQuestionError;
-  // 공고는 없어도 앱이 돌아야 한다. 0002 마이그레이션을 아직 안 올린 사이에
+  // 공고는 없어도 앱이 돌아야 한다. 테이블 하나가 빠졌다고
   // 여기서 던지면 자기소개서·면접 준비까지 같이 막힌다.
   if (jobError) console.error("공고를 읽지 못했다. supabase/schema.sql을 올렸는지 본다.", jobError);
   // 재료도 같은 이유로 다른 화면을 막지 않는다.
