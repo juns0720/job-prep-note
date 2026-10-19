@@ -4,9 +4,20 @@ import { BTN_CANCEL, BTN_ROW_TEXT, BTN_SAVE, INPUT_PANEL } from "../ui/classes";
 import { DdayBadge } from "../ui/DdayBadge";
 import { STATUS_LABEL } from "../ui/StatusBadge";
 import { dday, dueText, isSoon } from "@/lib/date";
-import { isSubmitted } from "@/lib/status";
+import { isStage, isSubmitted } from "@/lib/status";
 import { useStudyNote } from "@/lib/store";
-import type { Company } from "@/lib/types";
+import type { Company, CompanyStatus } from "@/lib/types";
+
+/**
+ * 제출한 회사의 배지 색. 지원 완료는 연한 파랑, 전형은 진한 파랑 채움, 합격은 초록, 탈락은 빨강.
+ * 선택된 파란 행 안에서는 연한 배경만 흰색으로 바꾼다 — 전형은 채운 색이라 그대로 둔다.
+ */
+function submittedBadge(status: CompanyStatus, picked: boolean): string {
+  if (isStage(status)) return "bg-accent text-white";
+  if (status === "rejected") return picked ? "bg-white text-rejected" : "bg-rejected-bg text-rejected";
+  if (status === "passed") return picked ? "bg-white text-passed" : "bg-passed-bg text-passed";
+  return picked ? "bg-white text-applied" : "bg-applied-bg text-applied";
+}
 
 export function CompanyRow({ company: c, picked }: { company: Company; picked: boolean }) {
   const s = useStudyNote();
@@ -83,15 +94,10 @@ export function CompanyRow({ company: c, picked }: { company: Company; picked: b
           </span>
           {submitted ? (
             <span
-              className={`shrink-0 rounded-chip px-8 py-5 text-12 font-semibold whitespace-nowrap ${
-                c.status === "rejected"
-                  ? picked
-                    ? "bg-white text-rejected"
-                    : "bg-rejected-bg text-rejected"
-                  : picked
-                    ? "bg-white text-passed"
-                    : "bg-passed-bg text-passed"
-              }`}
+              className={`shrink-0 rounded-chip px-8 py-5 text-12 font-semibold whitespace-nowrap ${submittedBadge(
+                c.status,
+                picked,
+              )}`}
             >
               {STATUS_LABEL[c.status]}
             </span>

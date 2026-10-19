@@ -24,8 +24,8 @@ const STATUS_PICKED: Record<Exclude<CompanyStatus, ProcessStage> | "stage", stri
   draft: "border-draft-bg bg-draft-bg text-draft",
   writing: "border-accent-border bg-accent-bg text-accent",
   applied: "border-applied-bg bg-applied-bg text-applied",
-  // 전형은 지원 완료에서 이어지는 단계라 같은 색을 쓴다. 둘이 같이 칠해질 일은 없다.
-  stage: "border-applied-bg bg-applied-bg text-applied",
+  // 전형은 지원 완료와 헷갈리지 않게 진한 파랑으로 채운다. 연한 파랑(지원 완료) → 진한 파랑(전형) 순으로 짙어진다.
+  stage: "border-accent bg-accent text-white",
   passed: "border-passed-bg bg-passed-bg text-passed",
   rejected: "border-rejected-bg bg-rejected-bg text-rejected",
 };
@@ -107,8 +107,9 @@ export function CoverDetail() {
                       <option value="" disabled hidden>
                         전형
                       </option>
+                      {/* 고른 칸이 흰 글자라, 펼친 목록이 그 색을 물려받지 않게 되돌린다. */}
                       {PROCESS_STAGES.map((stage) => (
-                        <option key={stage} value={stage}>
+                        <option key={stage} value={stage} className="bg-white text-ink">
                           {STATUS_LABEL[stage]}
                         </option>
                       ))}
