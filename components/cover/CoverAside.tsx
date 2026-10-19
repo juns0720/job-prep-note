@@ -99,7 +99,7 @@ export function CoverAside() {
                 </button>
               ) : periodLocked ? (
                 <span className="ml-auto text-115 text-muted">
-                  회사 {inPeriod.length}곳이 들어 있어 지울 수 없다
+                  등록된 회사 {inPeriod.length}곳이 있어 삭제할 수 없다
                 </span>
               ) : null}
             </div>
@@ -162,10 +162,10 @@ export function CoverAside() {
         {visible.length === 0 && (
           <div className="border-t border-divider px-14 py-22 text-center text-125 text-muted">
             {inPeriod.length === 0
-              ? "이 시기에 넣은 회사가 없다."
+              ? "이 시기에 등록한 회사가 없다."
               : s.coverView === "applied"
-                ? "아직 지원한 회사가 없다."
-                : "쓰고 있는 회사가 없다."}
+                ? "아직 지원을 완료한 회사가 없다."
+                : "작성 중인 자기소개서가 없다."}
           </div>
         )}
       </div>

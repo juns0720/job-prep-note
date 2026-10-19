@@ -1,12 +1,6 @@
 /**
- * 원본 디자인에 없던 화면이다. 화면을 그릴 수 없는 상태일 때 500 대신 이걸 보여준다.
- * 새 색이나 크기를 만들지 않고 로그인 화면과 같은 토큰만 썼다.
- *
- * 두 경우에 쓴다.
- * - error 없음: Supabase 접속값(환경 변수)이 비어 있다.
- * - error 있음: 접속은 되는데 데이터를 읽다가 실패했다. 대개 스키마를 아직
- *   안 올린 경우다. 사유를 그대로 보여준다 — 로그인한 사람만 보는 화면이고,
- *   여기서 감추면 배포된 곳에서 원인을 알 길이 없다.
+ * Supabase 환경 변수가 없거나 데이터 조회에 실패했을 때 설정 방법을 안내한다.
+ * error가 있으면 로그인한 사용자에게 조회 오류와 확인할 설정을 보여 준다.
  */
 export function SetupNotice({ error }: { error?: string }) {
   return (
@@ -29,9 +23,8 @@ function MissingKeys() {
     <>
       <h1 className="m-0 mb-7 text-15 font-semibold tracking-name">Supabase 접속값이 없다</h1>
       <p className="m-0 mb-18 text-13 leading-memo text-muted">
-        아래 두 값을 넣으면 화면이 열린다. 배포한 곳에서는 Vercel 프로젝트의
-        Settings · Environment Variables에, 내 컴퓨터에서는 .env.local에 넣는다.
-        값을 넣은 뒤에는 한 번 다시 배포해야 한다.
+        아래 두 값을 Vercel 프로젝트의 Settings → Environment Variables에 추가한 뒤 다시 배포한다.
+        내 컴퓨터에서 실행할 때는 .env.local에 넣고 개발 서버를 다시 시작한다.
       </p>
 
       <div className="rounded-input border border-line bg-surface p-14">
@@ -43,8 +36,8 @@ function MissingKeys() {
       </div>
 
       <p className="m-0 mt-18 text-12 leading-memo text-muted">
-        값은 Supabase 대시보드의 Connect 버튼이나 Project Settings · API Keys에 있다. 순서는
-        README.md의 설치 가이드에 적어뒀다.
+        값은 Supabase 대시보드의 Connect 또는 Project Settings → API Keys에서 확인한다.
+        자세한 설정 방법은 README.md의 5단계를 참고한다.
       </p>
     </>
   );
@@ -55,9 +48,9 @@ function DataError({ error }: { error: string }) {
     <>
       <h1 className="m-0 mb-7 text-15 font-semibold tracking-name">데이터를 읽지 못했다</h1>
       <p className="m-0 mb-18 text-13 leading-memo text-muted">
-        로그인은 됐는데 테이블을 읽는 데서 막혔다. 스키마를 아직 안 올렸다면
-        Supabase SQL Editor에서 supabase/schema.sql을 한 번 실행한다.
-        Table Editor에 테이블 열여섯 개가 보이면 준비된 것이다.
+        로그인 후 데이터를 불러오지 못했다. 처음 설치한다면 Supabase SQL Editor에서
+        supabase/schema.sql을 실행했는지 확인한다. 업데이트한 뒤 발생한 오류라면
+        추가로 실행할 SQL이 있는지 확인한다.
       </p>
 
       <div className="rounded-input border border-line bg-surface p-14">
@@ -65,8 +58,9 @@ function DataError({ error }: { error: string }) {
       </div>
 
       <p className="m-0 mt-18 text-12 leading-memo text-muted">
-        relation ... does not exist 면 스키마를 안 올린 것이고, 권한 이야기가 나오면
-        RLS 정책이 빠진 것이다. 순서는 README.md의 3단계에 있다.
+        relation ... does not exist 오류는 필요한 테이블이 있는지 확인한다.
+        권한 오류는 테이블 접근 권한과 RLS 정책을 확인한다.
+        자세한 방법은 README.md의 3단계와 문제 해결을 참고한다.
       </p>
     </>
   );

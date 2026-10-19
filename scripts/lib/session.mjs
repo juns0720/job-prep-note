@@ -28,7 +28,7 @@ export async function loadEnv() {
   try {
     text = await readFile(join(root, ".env.local"), "utf-8");
   } catch {
-    throw new Error(".env.local 이 없다. docs/job-collector.md의 '처음 사용하기'를 참고한다.");
+    throw new Error(".env.local이 없다. .env.local.example을 복사한 뒤 접속값을 채운다.");
   }
 
   const env = {};
@@ -54,7 +54,7 @@ export async function loadEnv() {
 async function ask(question, { silent = false } = {}) {
   if (!stdin.isTTY) {
     throw new Error(
-      "물어볼 수가 없다(터미널이 아니다). .env.local 에 STUDY_NOTE_EMAIL·STUDY_NOTE_PASSWORD 를 적거나 환경 변수로 준다.",
+      "대화형 터미널이 없어 로그인 정보를 입력받을 수 없다. .env.local이나 환경 변수에 STUDY_NOTE_EMAIL과 STUDY_NOTE_PASSWORD를 설정한다.",
     );
   }
   const rl = createInterface({ input: stdin, output: stdout, terminal: true });
@@ -74,7 +74,7 @@ async function ask(question, { silent = false } = {}) {
 export async function signIn() {
   const env = await loadEnv();
   for (const key of ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"]) {
-    if (!env[key]) throw new Error(`.env.local 에 ${key} 가 없다.`);
+    if (!env[key]) throw new Error(`.env.local에 ${key} 값이 없다.`);
   }
 
   // 계정은 .env.local -> 환경 변수 -> 물어보기 순으로 찾는다.

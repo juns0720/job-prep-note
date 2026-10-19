@@ -50,7 +50,7 @@ export function ProfileDetail() {
   if (!sec) {
     return (
       <div className="rounded-card border border-dashed border-field px-20 py-56 text-center">
-        <div className="mb-14 text-14 text-muted">왼쪽에서 섹션을 추가하면 지원서에 넣을 값을 모을 수 있다.</div>
+        <div className="mb-14 text-14 text-muted">기본 인적사항, 학력 등 섹션을 추가하고 지원서에 넣을 값을 기록한다.</div>
         <button
           type="button"
           onClick={s.addSection}
@@ -114,7 +114,7 @@ export function ProfileDetail() {
         <AutoGrowTextarea
           value={sec.note}
           onChange={(e) => s.setSection(sec.id, { note: e.target.value })}
-          placeholder="양식에 맞춰 바꾸는 방법, 입력할 때 지킬 것을 적는다."
+          placeholder="영문 이름 표기, 날짜 형식 등 입력할 때 적용할 규칙"
           className="w-full resize-none overflow-hidden rounded-btn border border-line bg-surface px-13 py-11 text-13 leading-memo text-body outline-none focus:border-accent focus:bg-white"
         />
       </div>

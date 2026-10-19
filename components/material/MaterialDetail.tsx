@@ -75,7 +75,7 @@ export function MaterialDetail() {
         ))}
         {items.length === 0 && (
           <div className="mt-18 border-t border-line px-20 py-52 text-center text-135 text-muted">
-            컨셉에서 문항 앞 칸을 체크하면 여기 모인다.
+            각 컨셉에서 최종으로 선택한 문항이 여기에 표시된다.
           </div>
         )}
       </div>
@@ -87,7 +87,7 @@ export function MaterialDetail() {
   if (!cur) {
     return (
       <div className="rounded-card border border-dashed border-field px-20 py-56 text-center">
-        <div className="mb-14 text-14 text-muted">왼쪽에서 컨셉을 추가하면 그 아래에 문항을 모을 수 있다.</div>
+        <div className="mb-14 text-14 text-muted">컨셉을 추가하고 관련 경험과 문항을 모은다.</div>
         <button
           type="button"
           onClick={s.addGroup}

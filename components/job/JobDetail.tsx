@@ -35,12 +35,12 @@ export function JobDetail() {
       <div className="rounded-card border border-dashed border-field px-20 py-56 text-center">
         <div className="text-14 text-muted">
           {s.jobView === "moved"
-            ? "자기소개서로 옮긴 공고가 여기 쌓인다."
+            ? "자기소개서에 추가한 공고를 확인할 수 있다."
             : s.jobView === "gone"
-              ? "목록에서 뺀 공고가 여기 쌓인다."
-              : "훑어볼 공고가 없다. 수집기를 돌리면 여기에 쌓인다."}
+              ? "삭제한 공고를 확인하고 대기 목록으로 되돌릴 수 있다."
+              : "검토할 공고가 없다. AI에게 공고를 수집해 앱에 넣어 달라고 요청한다."}
         </div>
-        {s.jobView === "open" && <div className="mt-7 text-125 text-muted">node scripts/collect.mjs</div>}
+        {s.jobView === "open" && <div className="mt-7 text-125 text-muted">수집 방법은 README의 공고 수집 가이드를 참고한다.</div>}
       </div>
     );
   }
@@ -64,12 +64,12 @@ export function JobDetail() {
 
       {job.picked && !job.deleted && (
         <div className="mb-14 rounded-input border border-accent-border bg-accent-bg px-15 py-12 text-13 text-picked-title">
-          자기소개서로 옮긴 공고다. 문항은 자기소개서 탭에서 쓴다.
+          자기소개서에 추가한 공고다. 답변은 자기소개서 탭에서 작성한다.
         </div>
       )}
       {job.deleted && (
         <div className="mb-14 rounded-input border border-line bg-surface px-15 py-12 text-13 text-muted">
-          목록에서 뺀 공고다. 다시 수집해도 대기 목록에 올라오지 않는다.
+          삭제한 공고다. 다시 수집해도 대기 목록에 추가되지 않는다.
         </div>
       )}
 
@@ -146,7 +146,7 @@ export function JobDetail() {
           <AutoGrowTextarea
             value={job.note}
             onChange={(e) => s.setJobNote(job.id, e.target.value)}
-            placeholder="왜 눈에 띄었는지 적어둔다. 자기소개서로 옮기면 그대로 따라간다."
+            placeholder="관심 있는 업무, 지원하려는 이유 (자기소개서에 추가할 때 함께 복사)"
             className="min-h-60 w-full resize-none overflow-hidden rounded-btn border border-line p-14 text-14 leading-memo text-body outline-none focus:border-accent"
           />
         </div>
@@ -160,7 +160,7 @@ export function JobDetail() {
             <span className="text-12 font-semibold text-muted">
               자소서 문항 <span className="tabular-nums">{job.questions.length}</span>개
             </span>
-            <span className="ml-auto text-115 text-muted">자기소개서로 옮기면 그대로 만들어진다</span>
+            <span className="ml-auto text-115 text-muted">자기소개서에 추가할 때 문항도 함께 복사된다</span>
           </div>
           <div className="flex flex-col gap-12">
             {job.questions.map((q, i) => (

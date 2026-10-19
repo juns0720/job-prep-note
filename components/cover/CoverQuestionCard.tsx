@@ -28,7 +28,7 @@ export function CoverQuestionCard({
         <AutoGrowTextarea
           value={q.t}
           onChange={(e) => s.setCoverQuestion(companyId, q.id, { t: e.target.value })}
-          placeholder="문항을 붙여넣는다."
+          placeholder="자소서 문항"
           className="min-h-40 min-w-0 flex-1 resize-none overflow-hidden rounded-input border border-transparent bg-surface px-10 py-9 text-145 leading-input font-semibold tracking-name text-ink outline-none focus:border-accent focus:bg-white"
         />
         <div className="flex items-center gap-4 pt-10">
@@ -57,7 +57,7 @@ export function CoverQuestionCard({
       <AutoGrowTextarea
         value={q.a}
         onChange={(e) => s.setCoverQuestion(companyId, q.id, { a: e.target.value })}
-        placeholder="답변을 쓴다."
+        placeholder="문항에 대한 답변"
         className="min-h-190 w-full resize-none overflow-hidden rounded-btn border border-line p-14 text-14 leading-answer text-body outline-none focus:border-accent"
       />
 

@@ -42,7 +42,7 @@ export function CoverDetail() {
   if (!co) {
     return (
       <div className="rounded-card border border-dashed border-field px-20 py-56 text-center">
-        <div className="mb-14 text-14 text-muted">왼쪽에서 회사를 추가하면 문항을 정리할 수 있다.</div>
+        <div className="mb-14 text-14 text-muted">회사를 추가하고 자소서 문항과 답변을 정리한다.</div>
         <button
           type="button"
           onClick={s.addCompany}
@@ -148,7 +148,7 @@ export function CoverDetail() {
               </button>
             </div>
             {co.events.length === 0 ? (
-              <div className="text-125 text-muted">코딩테스트·면접 날짜를 적으면 캘린더에 뜬다.</div>
+              <div className="text-125 text-muted">코딩테스트, 면접 날짜를 적으면 캘린더에도 표시된다.</div>
             ) : (
               <div className="flex flex-col gap-6">
                 {co.events.map((ev) => (
@@ -217,7 +217,7 @@ export function CoverDetail() {
         <textarea
           value={co.memo}
           onChange={(e) => s.setCompanyField(co.id, "memo", e.target.value)}
-          placeholder="공고에서 본 업무와 내가 해둔 것을 연결해서 적는다."
+          placeholder="공고의 업무와 관련된 경험, 지원하려는 이유"
           className="h-88 w-full resize-y rounded-btn border border-line px-13 py-11 text-14 leading-memo text-body outline-none focus:border-accent"
         />
       </div>

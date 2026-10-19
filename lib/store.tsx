@@ -1298,7 +1298,7 @@ export function StudyNoteProvider({
         } catch (e) {
           console.error("파일 올리기 실패", e);
           setProfileFiles((prev) => prev.filter((f) => f.id !== id));
-          window.alert(`${file.name}을 올리지 못했다. 인터넷 연결과 파일 크기(20MB까지)를 확인하고 다시 올려 줘.`);
+          window.alert(`${file.name}을 올리지 못했다. 인터넷 연결과 파일 크기(최대 20MB)를 확인한 뒤 다시 올린다.`);
         }
       },
       setProfileFileLabel: (id, label) => {

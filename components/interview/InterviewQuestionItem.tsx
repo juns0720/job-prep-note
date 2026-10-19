@@ -24,10 +24,10 @@ export function InterviewQuestionItem({
         <AutoGrowTextarea
           value={s.qDraft.t}
           onChange={(e) => s.setQDraft({ t: e.target.value })}
-          placeholder="질문을 적는다."
+          placeholder="예상 면접 질문"
           className="mb-12 min-h-42 w-full resize-none overflow-hidden rounded-input border border-field bg-white px-12 py-10 text-145 leading-input font-semibold tracking-name text-ink outline-none focus:border-accent"
         />
-        <div className={LABEL_MINI}>핵심 키워드, 쉼표로 구분한다</div>
+        <div className={LABEL_MINI}>핵심 키워드 (쉼표로 구분)</div>
         <input
           value={s.qDraft.k}
           onChange={(e) => s.setQDraft({ k: e.target.value })}
@@ -38,7 +38,7 @@ export function InterviewQuestionItem({
         <textarea
           value={s.qDraft.a}
           onChange={(e) => s.setQDraft({ a: e.target.value })}
-          placeholder="답변을 적는다."
+          placeholder="질문에 대한 답변"
           className="h-170 w-full resize-y rounded-btn border border-field bg-white p-13 text-14 leading-answer text-body outline-none focus:border-accent"
         />
         <div className="mt-12 flex items-center gap-6">

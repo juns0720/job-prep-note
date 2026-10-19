@@ -155,7 +155,7 @@ function AgendaList({
   if (dates.length === 0) {
     return (
       <div className="rounded-card border border-dashed border-field px-20 py-56 text-center text-14 text-muted">
-        이 달에 잡힌 마감이나 일정이 없다.
+        이번 달에는 등록된 마감일이나 전형 일정이 없다.
       </div>
     );
   }

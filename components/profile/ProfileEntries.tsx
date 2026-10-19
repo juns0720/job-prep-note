@@ -42,7 +42,7 @@ export function ProfileEntries({ sec }: { sec: ProfileSection }) {
 
       {editing && (
         <div className="mb-14 rounded-panel border border-field bg-surface p-12">
-          <div className={LABEL_MINI}>칸 이름 · 넓게 쓸 칸은 체크</div>
+          <div className={LABEL_MINI}>칸 이름을 정하고 넓게 표시할 칸을 선택한다</div>
           <div className="flex flex-col gap-6">
             {sec.columns.map((c) => (
               <div key={c.id} className="flex items-center gap-8">
@@ -116,13 +116,13 @@ export function ProfileEntries({ sec }: { sec: ProfileSection }) {
                     </div>
                   );
                 })}
-                {sec.columns.length === 0 && <div className="col-span-full text-125 text-muted">칸 편집에서 칸을 먼저 만든다.</div>}
+                {sec.columns.length === 0 && <div className="col-span-full text-125 text-muted">칸 편집에서 기록할 항목을 먼저 추가한다.</div>}
               </div>
             </div>
           );
         })}
         {sec.entries.length === 0 && (
-          <div className="rounded-card border border-line px-20 py-40 text-center text-135 text-muted">아직 적은 건이 없다.</div>
+          <div className="rounded-card border border-line px-20 py-40 text-center text-135 text-muted">아직 등록한 내역이 없다.</div>
         )}
       </div>
       <button type="button" onClick={() => s.addProfileEntry(sec.id)} className={`${BTN_SMALL} mt-10`}>

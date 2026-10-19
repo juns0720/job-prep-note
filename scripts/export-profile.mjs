@@ -85,7 +85,7 @@ async function main() {
     const out = [
       "# 인적사항",
       "",
-      `인적사항 탭에서 ${new Date().toISOString().slice(0, 10)}에 뽑았다. 값이 \`${MISSING}\`이면 아직 받지 않은 것이다.`,
+      `인적사항 탭에서 ${new Date().toISOString().slice(0, 10)}에 내보낸 내용이다. \`${MISSING}\`은 값이 입력되지 않은 항목이다.`,
       "",
     ];
     for (const sec of sections) {
@@ -98,7 +98,7 @@ async function main() {
       );
     }
 
-    out.push("## 첨부 파일·링크", "", "포트폴리오·이력서는 링크를 먼저 쓰고, 파일로만 받는 곳에는 Word를 낸다.", "");
+    out.push("## 첨부 파일·링크", "", "포트폴리오와 이력서는 링크를 먼저 사용하고, 파일만 받는 양식에는 Word 파일을 첨부한다.", "");
     out.push(`- 포트폴리오 링크: ${links?.portfolio || MISSING}`, `- 이력서 링크: ${links?.resume || MISSING}`, "");
 
     if (!toStdout) {

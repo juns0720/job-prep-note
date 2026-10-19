@@ -67,7 +67,7 @@ export function MaterialAside() {
         ))}
         {s.materialGroups.length === 0 && (
           <div className="border-t border-divider px-14 py-22 text-center text-125 text-muted">
-            갈등 상황, 기술 답변처럼 큰 컨셉부터 만든다.
+            갈등 상황, 기술 경험 등 재료를 묶을 컨셉을 추가한다.
           </div>
         )}
       </div>

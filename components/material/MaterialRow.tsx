@@ -99,7 +99,7 @@ export function MaterialRow({
         <AutoGrowTextarea
           value={m.t}
           onChange={(e) => s.setMaterial(groupId, m.id, { t: e.target.value })}
-          placeholder="내용을 적는다."
+          placeholder="경험이나 답변에 쓸 내용"
           className="mt-8 min-h-88 w-full resize-none overflow-hidden rounded-btn border border-line px-13 py-11 text-14 leading-answer text-body outline-none focus:border-accent"
         />
       )}

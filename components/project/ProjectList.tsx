@@ -23,7 +23,7 @@ export function ProjectList() {
 
       {s.projects.length === 0 && (
         <div className="rounded-card border border-dashed border-field px-20 py-56 text-center">
-          <div className="mb-14 text-14 text-muted">프로젝트를 추가하면 설명과 키워드를 적을 수 있다.</div>
+          <div className="mb-14 text-14 text-muted">프로젝트를 추가하고 담당한 작업과 기술 키워드를 기록한다.</div>
           <button
             type="button"
             onClick={s.addProject}
@@ -42,8 +42,8 @@ export function ProjectList() {
               <AutoGrowTextarea
                 value={p.name}
                 onChange={(e) => s.setProject(p.id, { name: e.target.value.replace(/\n/g, "") })}
-                placeholder="프로젝트 명"
-                aria-label="프로젝트 명"
+                placeholder="프로젝트명"
+                aria-label="프로젝트명"
                 className="mb-14 min-w-0 flex-1 resize-none overflow-hidden rounded-input border border-transparent bg-surface px-10 py-9 text-145 leading-input font-semibold tracking-name text-ink outline-none focus:border-accent focus:bg-white"
               />
               <button
@@ -59,7 +59,7 @@ export function ProjectList() {
             <AutoGrowTextarea
               value={p.description}
               onChange={(e) => s.setProject(p.id, { description: e.target.value })}
-              placeholder="무엇을 만들었고 무엇을 맡았는지 적는다."
+              placeholder="만든 기능과 담당한 작업"
               className="mb-14 w-full resize-none overflow-hidden rounded-btn border border-line px-13 py-11 text-14 leading-memo text-body outline-none focus:border-accent"
             />
 
@@ -67,7 +67,7 @@ export function ProjectList() {
             <AutoGrowTextarea
               value={p.keywords}
               onChange={(e) => s.setProject(p.id, { keywords: e.target.value })}
-              placeholder="쉼표로 이어 쓴다. Spring Boot, JPA, 동시성 ..."
+              placeholder="Spring Boot, JPA, 동시성 (쉼표로 구분)"
               className="w-full resize-none overflow-hidden rounded-btn border border-line px-13 py-11 text-14 leading-input text-body outline-none focus:border-accent"
             />
           </div>

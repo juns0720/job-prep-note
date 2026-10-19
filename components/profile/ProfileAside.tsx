@@ -50,7 +50,7 @@ export function ProfileAside() {
           );
         })}
         {s.profileSections.length === 0 && (
-          <div className="px-14 py-22 text-center text-125 text-muted">기본 인적사항, 학력처럼 지원서의 큰 칸부터 만든다.</div>
+          <div className="px-14 py-22 text-center text-125 text-muted">기본 인적사항, 학력 등 내용을 나눠 담을 섹션을 추가한다.</div>
         )}
       </div>
     </div>

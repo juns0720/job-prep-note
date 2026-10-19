@@ -140,7 +140,7 @@ function SaveControl() {
     setBusy(true);
     const ok = await s.saveNow();
     setBusy(false);
-    if (!ok) window.alert("저장하지 못했다. 인터넷 연결과 로그인 상태를 확인하고 다시 저장을 눌러 줘.");
+    if (!ok) window.alert("저장하지 못했다. 인터넷 연결과 로그인 상태를 확인한 뒤 다시 저장한다.");
   };
 
   return (

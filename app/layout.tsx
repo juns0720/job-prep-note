@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "study·note",
-  description: "취업 준비 기록 — 자기소개서와 면접 준비",
+  description: "자기소개서, 인적사항, 면접 답변과 채용 일정을 정리하는 개인용 웹앱",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -92,7 +92,7 @@ export function ProfileFiles() {
           </div>
         ) : (
           <div className="rounded-card border border-dashed border-field px-20 py-32 text-center text-135 text-muted">
-            증명사진을 올리면 지원서 사진 칸에 그대로 쓴다.
+            지원서에 첨부할 증명사진을 올린다.
           </div>
         )}
       </div>
@@ -144,10 +144,10 @@ export function ProfileFiles() {
             </div>
           ))}
           {docs.length === 0 && (
-            <div className="px-14 py-22 text-center text-125 text-muted">성적증명서, 자격증 사본, 포트폴리오·이력서 Word를 올린다.</div>
+            <div className="px-14 py-22 text-center text-125 text-muted">성적증명서, 자격증 사본, 포트폴리오와 이력서 Word 파일을 올린다.</div>
           )}
         </div>
-        <div className={`${LABEL_FIELD} mt-8 font-medium`}>포트폴리오·이력서는 링크를 먼저 쓰고, 파일로만 받는 곳에는 Word를 낸다.</div>
+        <div className={`${LABEL_FIELD} mt-8 font-medium`}>포트폴리오와 이력서는 링크를 먼저 사용하고, 파일만 받는 양식에는 Word 파일을 첨부한다.</div>
       </div>
     </div>
   );

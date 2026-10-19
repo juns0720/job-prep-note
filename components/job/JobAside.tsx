@@ -100,9 +100,9 @@ function sourcesOf(jobs: JobPosting[]): string[] {
 }
 
 function emptyText(view: JobView): string {
-  if (view === "moved") return "아직 자기소개서로 옮긴 공고가 없다.";
-  if (view === "gone") return "뺀 공고가 없다.";
-  return "훑어볼 공고가 없다. 수집기를 돌린다.";
+  if (view === "moved") return "아직 자기소개서에 추가한 공고가 없다.";
+  if (view === "gone") return "삭제한 공고가 없다.";
+  return "검토할 공고가 없다. AI에게 공고 수집을 요청한다.";
 }
 
 /**

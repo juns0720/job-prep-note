@@ -51,7 +51,7 @@ export default function LoginPage() {
 
         <div className="rounded-card border border-line p-24">
           <h1 className="m-0 mb-7 text-15 font-semibold tracking-name">로그인</h1>
-          <p className="m-0 mb-18 text-13 text-muted">이메일과 비밀번호를 넣는다.</p>
+          <p className="m-0 mb-18 text-13 text-muted">이메일과 비밀번호로 로그인한다.</p>
 
           <form onSubmit={handleSubmit}>
             <input
@@ -102,6 +102,6 @@ function errorText(raw: string): string {
   if (/invalid login credentials/i.test(raw)) return "이메일이나 비밀번호가 맞지 않는다.";
   if (/email not confirmed/i.test(raw)) return "이메일 확인이 끝나지 않은 계정이다.";
   if (/url and .*required/i.test(raw)) return "Supabase 접속값이 없다.";
-  if (/fetch|network/i.test(raw)) return "서버에 닿지 못했다. 잠시 뒤 다시 누른다.";
+  if (/fetch|network/i.test(raw)) return "서버에 연결하지 못했다. 잠시 후 다시 시도한다.";
   return raw;
 }
